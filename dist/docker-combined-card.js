@@ -362,7 +362,12 @@
         }
 
         this._containersValue.textContent = `${running} / ${total}`;
-        this._subtitle.textContent = `${total} containers in totaal`;
+        // Aantal projecten: de geconfigureerde projecten plus "Other" als die containers heeft
+        const projectCount = this._projects.length + (otherNames.length ? 1 : 0);
+
+        this._subtitle.textContent =
+          `${total} ${total === 1 ? "container" : "containers"} in ` +
+          `${projectCount} ${projectCount === 1 ? "project" : "projecten"}`;
         this._cpuValue.textContent = `${totalCpu.toFixed(1)}%`;
         this._memoryValue.textContent = `${totalMemory.toFixed(0)} MB`;
 
