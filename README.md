@@ -10,21 +10,12 @@ functionality.
 
 ## Contents
 
-  -----------------------------------------------------------------------
-  Card                                Description
-  ----------------------------------- -----------------------------------
-  **Custom Network Infrastructure     Router status, networks, connected
-  Card**                              users and network devices
-
-  **Synology NAS Card**               NAS status, system usage, network
-                                      traffic, volumes and disks
-
-  **Custom Desktop Card**             Desktop computer status and
-                                      performance
-
-  **Docker Combined Card**            Overview of Docker containers,
-                                      grouped by project
-  -----------------------------------------------------------------------
+| Card | Description |
+| :--- | :--- |
+| **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices |
+| **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks |
+| **Custom Desktop Card** | Desktop computer status and performance |
+| **Docker Combined Card** | Overview of Docker containers, grouped by project |
 
 ## Installation
 
@@ -77,73 +68,38 @@ network devices.
 
 ### Configuration options
 
-  ------------------------------------------------------------------------
-  Option                   Required                Description
-  ------------------------ ----------------------- -----------------------
-  `name`                   Yes                     Card title
-
-  `router_status_entity`   No                      Entity used to
-                                                   determine the router
-                                                   status (`on` = Online,
-                                                   `off` = Offline)
-
-  `wan_ip_tracker`         No                      `device_tracker` entity
-                                                   used to retrieve the
-                                                   WAN IP address
-
-  `networks`               No                      List of network
-                                                   connections
-
-  `devices`                No                      List of network devices
-
-  `css_url`                No                      Alternative path to the
-                                                   shared stylesheet
-  ------------------------------------------------------------------------
+| Option | Required | Description |
+| :--- | :--- | :--- |
+| `name` | Yes | Card title |
+| `router_status_entity` | No | Entity used to determine the router status (`on` = Online, `off` = Offline) |
+| `wan_ip_tracker` | No | `device_tracker` entity used to retrieve the WAN IP address |
+| `networks` | No | List of network connections |
+| `devices` | No | List of network devices |
+| `css_url` | No | Alternative path to the shared stylesheet |
 
 ### Networks
 
 Each network supports the following options:
 
-  -----------------------------------------------------------------------
-  Option                              Description
-  ----------------------------------- -----------------------------------
-  `name`                              Displayed network name
-
-  `type`                              `wlan` for Wi-Fi; any other value
-                                      is treated as Ethernet
-
-  `connected_users`                   Entity containing the number of
-                                      connected users, or a list of
-                                      numeric entities whose values are
-                                      added together
-  -----------------------------------------------------------------------
+| Option | Description |
+| :--- | :--- |
+| `name` | Displayed network name |
+| `type` | `wlan` for Wi-Fi; any other value is treated as Ethernet |
+| `connected_users` | Entity containing the number of connected users, or a list of numeric entities whose values are added together |
 
 ### Devices
 
 Each device supports the following options:
 
-  -----------------------------------------------------------------------
-  Option                              Description
-  ----------------------------------- -----------------------------------
-  `name`                              Device name
-
-  `type`                              `router`, `switch`, `ap` or
-                                      `accesspoint`
-
-  `ip`                                Static IP address used as a
-                                      fallback
-
-  `device_tracker`                    Optional entity used to dynamically
-                                      retrieve the IP address from its
-                                      `ip` attribute
-
-  `cpu`                               CPU usage sensor
-
-  `memory`                            RAM usage sensor
-
-  `restart_action`                    Optional action for the restart
-                                      button
-  -----------------------------------------------------------------------
+| Option | Description |
+| :--- | :--- |
+| `name` | Device name |
+| `type` | `router`, `switch`, `ap` or `accesspoint` |
+| `ip` | Static IP address used as a fallback |
+| `device_tracker` | Optional entity used to dynamically retrieve the IP address from its `ip` attribute |
+| `cpu` | CPU usage sensor |
+| `memory` | RAM usage sensor |
+| `restart_action` | Optional action for the restart button |
 
 ### Example
 
@@ -192,40 +148,40 @@ volumes and individual disks.
 
 ### Configuration options
 
-  Option          Required   Description
-  --------------- ---------- -------------------------------------------
-  `name`          Yes        NAS name
-  `temperature`   No         NAS temperature sensor
-  `security`      No         Entity representing the security status
-  `cpu`           No         CPU usage sensor
-  `memory`        No         RAM usage sensor
-  `network_rx`    No         Incoming network traffic sensor
-  `network_tx`    No         Outgoing network traffic sensor
-  `volumes`       No         List of storage volumes
-  `css_url`       No         Alternative path to the shared stylesheet
+| Option | Required | Description |
+| :--- | :--- | :--- |
+| `name` | Yes | NAS name |
+| `temperature` | No | NAS temperature sensor |
+| `security` | No | Entity representing the security status |
+| `cpu` | No | CPU usage sensor |
+| `memory` | No | RAM usage sensor |
+| `network_rx` | No | Incoming network traffic sensor |
+| `network_tx` | No | Outgoing network traffic sensor |
+| `volumes` | No | List of storage volumes |
+| `css_url` | No | Alternative path to the shared stylesheet |
 
 ### Volumes
 
 Each volume supports the following options:
 
-  Option     Description
-  ---------- ---------------------------------------
-  `name`     Volume name
-  `used`     Sensor for used storage capacity
-  `size`     Sensor for total storage capacity
-  `status`   Entity representing the volume status
-  `disks`    List of associated disks
+| Option | Description |
+| :--- | :--- |
+| `name` | Volume name |
+| `used` | Sensor for used storage capacity |
+| `size` | Sensor for total storage capacity |
+| `status` | Entity representing the volume status |
+| `disks` | List of associated disks |
 
 ### Disks
 
 Each disk supports the following options:
 
-  Option          Description
-  --------------- -------------------------------------
-  `name`          Disk name
-  `type`          `ssd` or `hdd`
-  `temperature`   Disk temperature sensor
-  `status`        Entity representing the disk status
+| Option | Description |
+| :--- | :--- |
+| `name` | Disk name |
+| `type` | `ssd` or `hdd` |
+| `temperature` | Disk temperature sensor |
+| `status` | Entity representing the disk status |
 
 If Home Assistant device metadata is available, the manufacturer and
 model are automatically displayed after the disk name.
@@ -286,30 +242,16 @@ A compact card for monitoring a desktop computer.
 
 ### Configuration options
 
-  -----------------------------------------------------------------------
-  Option                  Required                Description
-  ----------------------- ----------------------- -----------------------
-  `name`                  Yes                     Computer name
-
-  `device_tracker`        No                      Entity used to
-                                                  determine the
-                                                  online/offline status
-
-  `cpu`                   No                      CPU usage sensor
-
-  `memory`                No                      RAM usage sensor
-
-  `temperature`           No                      Temperature sensor
-
-  `storage_used`          No                      Used storage capacity
-                                                  sensor
-
-  `storage_free`          No                      Available storage
-                                                  capacity sensor
-
-  `css_url`               No                      Alternative path to the
-                                                  shared stylesheet
-  -----------------------------------------------------------------------
+| Option | Required | Description |
+| :--- | :--- | :--- |
+| `name` | Yes | Computer name |
+| `device_tracker` | No | Entity used to determine the online/offline status |
+| `cpu` | No | CPU usage sensor |
+| `memory` | No | RAM usage sensor |
+| `temperature` | No | Temperature sensor |
+| `storage_used` | No | Used storage capacity sensor |
+| `storage_free` | No | Available storage capacity sensor |
+| `css_url` | No | Alternative path to the shared stylesheet |
 
 ### Example
 
@@ -354,27 +296,19 @@ automatically grouped under **Other**.
 
 ### Configuration options
 
-  ------------------------------------------------------------------------
-  Option            Required          Default            Description
-  ----------------- ----------------- ------------------ -----------------
-  `projects`        No                `[]`               List of Docker
-                                                         projects
-
-  `entity_prefix`   No                `unraid_docker_`   Prefix used by
-                                                         Docker entities
-
-  `css_url`         No                Automatic          Alternative path
-                                                         to the shared
-                                                         stylesheet
-  ------------------------------------------------------------------------
+| Option | Required | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `projects` | No | `[]` | List of Docker projects |
+| `entity_prefix` | No | `unraid_docker_` | Prefix used by Docker entities |
+| `css_url` | No | Automatic | Alternative path to the shared stylesheet |
 
 Each project supports:
 
-  Option         Required   Description
-  -------------- ---------- -------------------------
-  `name`         Yes\*      Displayed project name
-  `project`      Yes\*      Alternative to `name`
-  `containers`   Yes        List of container names
+| Option | Required | Description |
+| :--- | :--- | :--- |
+| `name` | Yes\* | Displayed project name |
+| `project` | Yes\* | Alternative to `name` |
+| `containers` | Yes | List of container names |
 
 \*Provide either `name` or `project` for each project.
 
@@ -383,13 +317,13 @@ Each project supports:
 For a container named `nextcloud` and the default prefix
 `unraid_docker_`, the card expects the following entities:
 
-  Function           Entity
-  ------------------ -----------------------------------------------
-  On/off status      `switch.unraid_docker_nextcloud`
-  CPU usage          `sensor.unraid_docker_nextcloud_cpu`
-  Memory usage       `sensor.unraid_docker_nextcloud_memory_usage`
-  Network received   `sensor.unraid_docker_nextcloud_network_rx`
-  Network sent       `sensor.unraid_docker_nextcloud_network_tx`
+| Function | Entity |
+| :--- | :--- |
+| On/off status | `switch.unraid_docker_nextcloud` |
+| CPU usage | `sensor.unraid_docker_nextcloud_cpu` |
+| Memory usage | `sensor.unraid_docker_nextcloud_memory_usage` |
+| Network received | `sensor.unraid_docker_nextcloud_network_rx` |
+| Network sent | `sensor.unraid_docker_nextcloud_network_tx` |
 
 Change `entity_prefix` if your entities use a different prefix.
 
