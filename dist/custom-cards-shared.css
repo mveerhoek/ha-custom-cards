@@ -1,0 +1,595 @@
+/* ==========================================================================
+   Gedeelde stijlen voor de custom cards:
+     - custom-network-infrastructure-card
+     - synology-nas-card
+     - custom-desktop-card
+     - docker-combined-card
+
+   Opbouw
+     1. Basis en gedeelde onderdelen (voor alle kaarten)
+     2. Gedeelde rij-onderdelen (lijsten van apparaten, volumes, containers)
+     3. Kaartspecifiek, per kaart:
+          - regels die een gedeeld onderdeel aanpassen staan achter
+            :host(<kaart-tag>), zodat de ene kaart de andere niet raakt
+          - klassen die maar in één kaart voorkomen staan zonder prefix
+
+   Instellingen per kaart gaan via CSS-variabelen (--cc-...), zie sectie 3.
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. Basis en gedeelde onderdelen
+   ========================================================================== */
+
+ha-card {
+  padding: var(--cc-card-padding, 12px);
+  border: 1px solid var(--divider-color);
+  border-radius: var(--ha-card-border-radius, 12px);
+  background: var(--ha-card-background, var(--card-background-color));
+  color: var(--primary-text-color);
+  box-shadow: none;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ----- Kop: icoon, titel en samenvatting links, status rechts ----- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-header-gap, 12px);
+  user-select: none;
+  outline: none;
+}
+
+.card-icon {
+  color: var(--state-icon-color, var(--primary-color));
+  --mdc-icon-size: var(--cc-icon-size, 28px);
+  flex-shrink: 0;
+}
+
+.card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.card-summary {
+  color: var(--secondary-text-color);
+  font-size: 12px;
+  line-height: 18px;
+  margin-top: 2px;
+}
+
+.summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 5px;
+  white-space: nowrap;
+}
+
+/* Statusindicator met extra regel eronder (WAN IP, beveiliging) */
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.wan-ip,
+.security-status {
+  font-size: 11px;
+  color: var(--secondary-text-color);
+  white-space: nowrap;
+}
+
+.wan-ip {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- Statusindicator: gekleurde achtergrond met witte tekst ----- */
+
+.status-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: var(--secondary-background-color);
+  color: var(--secondary-text-color);
+}
+
+.status-badge.status-success {
+  background: var(--success-color, #4caf50);
+  color: #fff;
+}
+
+.status-badge.status-warning {
+  background: var(--warning-color, #ff9800);
+  color: #fff;
+}
+
+.status-badge.status-error {
+  background: var(--error-color, #f44336);
+  color: #fff;
+}
+
+.status-badge.status-muted {
+  background: #757575;
+  color: #fff;
+}
+
+/* ----- Klikbare waarde (opent het more-info dialoog) ----- */
+
+.clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.clickable:hover,
+.clickable:focus-visible {
+  background: var(--secondary-background-color);
+  color: var(--primary-text-color);
+  outline: none;
+}
+
+/* ----- Klikbare rij of kop (uit-/inklappen): hover kleurt de achtergrond ----- */
+
+.hoverable {
+  cursor: pointer;
+  user-select: none;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.hoverable:hover {
+  background: var(--secondary-background-color);
+}
+
+/* ----- Scheidingslijnen ----- */
+
+.divider,
+.volume-divider,
+.devices-divider {
+  height: 1px;
+  background: var(--divider-color);
+}
+
+/* ----- Overig ----- */
+
+.empty {
+  color: var(--secondary-text-color);
+  font-size: 12px;
+}
+
+.network-icon {
+  --mdc-icon-size: 14px;
+}
+
+.col-center {
+  justify-self: center;
+  text-align: center;
+}
+
+.col-end {
+  justify-self: end;
+  text-align: right;
+}
+
+
+/* ==========================================================================
+   2. Gedeelde rij-onderdelen
+   ========================================================================== */
+
+/* Uitklapbare lijst direct onder de kop */
+.devices-list,
+.volume-list {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--divider-color);
+}
+
+/* Lijst als kolommen: icoon | naam | waarde | waarde | waarde | knop */
+.devices-list,
+.container-grid {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto;
+  column-gap: 8px;
+  align-items: center;
+}
+
+/* Icoon voor een rij */
+.device-icon,
+.volume-icon,
+.disk-icon,
+.container-icon {
+  --mdc-icon-size: 18px;
+  color: var(--secondary-text-color);
+  flex-shrink: 0;
+}
+
+/* Naam in een kolomrij */
+.device-name,
+.container-name {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Meetwaarde (IP, CPU, RAM, gebruik, temperatuur) */
+.device-value,
+.volume-usage,
+.disk-temperature,
+.container-value {
+  font-size: 11px;
+  color: var(--secondary-text-color);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.disk-temperature {
+  flex-shrink: 0;
+}
+
+/* Status in tekst (Actief, Gestopt, Normaal, ...) */
+.volume-state,
+.disk-state,
+.container-state {
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--secondary-text-color);
+}
+
+.volume-state.normal,
+.disk-state.normal,
+.disk-icon.normal,
+.container-state.running,
+.container-icon.running {
+  color: var(--success-color, var(--state-active-color));
+}
+
+.volume-state.warning,
+.disk-state.warning {
+  color: var(--warning-color, #e69500);
+  font-weight: 700;
+}
+
+.disk-icon.warning {
+  color: var(--warning-color, #e69500);
+}
+
+.volume-state.error,
+.disk-state.error {
+  color: var(--error-color, #db4437);
+  font-weight: 700;
+}
+
+.disk-icon.error {
+  color: var(--error-color, #db4437);
+}
+
+/* Ronde icoonknop aan het eind van een rij (herstarten, aan/uit) */
+.restart-btn,
+.container-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+
+/* ==========================================================================
+   3. Kaartspecifiek
+   ========================================================================== */
+
+/* ---------- Gedeelde instellingen voor de compacte kaarten ---------- */
+
+:host(custom-network-infrastructure-card),
+:host(synology-nas-card) {
+  --cc-card-padding: 8px;
+  --cc-icon-size: 26px;
+  --cc-header-gap: 10px;
+}
+
+
+/* ---------- custom-network-infrastructure-card ---------- */
+
+:host(custom-network-infrastructure-card) .network-icon {
+  color: var(--secondary-text-color);
+}
+
+:host(custom-network-infrastructure-card) .empty {
+  grid-column: 1 / -1;
+  padding: 4px 10px;
+}
+
+.networks-summary {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.network-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--secondary-text-color);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.devices-list {
+  /* rij 1 = koprij, rij 2 = dunne scheidingslijn, daarna de apparaten */
+  grid-template-rows: minmax(25px, auto) 1px;
+  grid-auto-rows: minmax(25px, auto);
+}
+
+.device-header-cell {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--secondary-text-color);
+  white-space: nowrap;
+}
+
+.devices-divider {
+  grid-column: 1 / -1;
+}
+
+.device-icon {
+  margin-left: 10px;
+}
+
+.device-ip {
+  opacity: 0.8;
+}
+
+.restart-btn {
+  border-radius: 50%;
+  color: var(--error-color, #f44336);
+}
+
+.restart-btn ha-icon {
+  --mdc-icon-size: 18px;
+  color: var(--error-color, #f44336);
+}
+
+.restart-btn:hover,
+.restart-btn:focus-visible {
+  background: var(--secondary-background-color);
+  outline: none;
+}
+
+
+/* ---------- synology-nas-card ---------- */
+
+:host(synology-nas-card) .empty {
+  padding: 4px 0;
+}
+
+.network-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  color: var(--secondary-text-color);
+  font-size: 12px;
+  line-height: 18px;
+  margin-top: 2px;
+}
+
+.network-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.volume-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.volume-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  font-size: 13px;
+}
+
+.volume-icon {
+  --mdc-icon-size: 19px;
+}
+
+.volume-name {
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.volume-divider {
+  margin: 7px 0;
+}
+
+.disks-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.disk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 25px;
+  font-size: 13px;
+  padding-left: 29px;
+}
+
+.disk-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.disk-model {
+  color: var(--secondary-text-color);
+  font-size: 10px;
+  font-weight: 400;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+
+/* ---------- custom-desktop-card ---------- */
+/* Deze kaart gebruikt uitsluitend de gedeelde onderdelen hierboven. */
+
+
+/* ---------- docker-combined-card ---------- */
+
+/* Kop: ruimer hovervlak, de inhoud blijft op zijn plek */
+:host(docker-combined-card) .header {
+  padding: 4px 6px;
+  margin: -4px -6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+:host(docker-combined-card) .header:focus-visible,
+.project-header:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+:host(docker-combined-card) .divider {
+  margin-bottom: 10px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metric {
+  min-width: 0;
+}
+
+.metric-label {
+  color: var(--secondary-text-color);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.metric-value {
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Projectenlijst */
+
+.projects {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--divider-color);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project {
+  border: 1px solid var(--outline-color, var(--divider-color));
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--secondary-background-color);
+  background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+}
+
+.project-header {
+  display: block;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+
+/* Hover-effect (alleen op apparaten met muis): achtergrond kleurt mee */
+@media (hover: hover) {
+  :host(docker-combined-card) .header:hover {
+    background: var(--secondary-background-color);
+  }
+
+  .project-header:hover {
+    background: var(--divider-color);
+    background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+  }
+}
+
+.project-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+/* Containers per project */
+
+.container-grid {
+  margin-top: 8px;
+  /* icoon | naam | CPU | RAM | status | schakelaar */
+  grid-auto-rows: minmax(32px, auto);
+}
+
+.container-toggle {
+  color: var(--secondary-text-color);
+}
+
+.container-toggle:hover {
+  color: var(--primary-color);
+}
+
+.container-toggle.running {
+  color: var(--success-color, var(--state-active-color));
+}
+
+.container-toggle ha-icon {
+  --mdc-icon-size: 24px;
+}
+
+.container-toggle:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
