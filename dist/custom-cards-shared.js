@@ -22,11 +22,11 @@
   // De gedeelde stylesheet staat naast dit bestand. Wordt het script als module
   // geladen, dan is de locatie onbekend en geldt /local/custom-cards-shared.css.
   // Per kaart te overschrijven met css_url in de kaartconfiguratie.
-   const CSS_URL = new URL(
-      "./custom-cards-shared.css",
-      import.meta.url
-   ).href;
-   
+  const CSS_URL = new URL(
+    "./custom-cards-shared.css",
+    import.meta.url
+  ).href;
+
   class CardBase extends HTMLElement {
     // ----- Levenscyclus -----
 
