@@ -151,7 +151,34 @@
 
     registerCard("custom-desktop-card", CustomDesktopCard, {
       name: "Custom Desktop Card",
-      description: "Toont CPU, RAM, Temp en Opslag (Gebruikt / Totaal) in een minimalistische stijl."
+      description: "Toont CPU, RAM, Temp en Opslag (Gebruikt / Totaal) in een minimalistische stijl.",
+      editor: {
+        schema: [
+          { name: "name", required: true, selector: { text: {} } },
+          { name: "device_tracker", selector: { entity: { domain: "device_tracker" } } },
+          { name: "cpu", selector: { entity: { domain: "sensor" } } },
+          { name: "memory", selector: { entity: { domain: "sensor" } } },
+          { name: "temperature", selector: { entity: { domain: "sensor" } } },
+          { name: "storage_used", selector: { entity: { domain: "sensor" } } },
+          { name: "storage_free", selector: { entity: { domain: "sensor" } } },
+          { name: "css_url", selector: { text: {} } }
+        ],
+        labels: {
+          name: "Naam",
+          device_tracker: "Device tracker (status Online/Offline)",
+          cpu: "CPU-gebruik",
+          memory: "RAM-gebruik",
+          temperature: "Temperatuur",
+          storage_used: "Opslag gebruikt",
+          storage_free: "Opslag vrij",
+          css_url: "Pad naar stylesheet (optioneel)"
+        },
+        helpers: {
+          device_tracker: "De status home geeft Online, not_home geeft Offline.",
+          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
+        }
+      },
+      stubConfig: { name: "Desktop" }
     });
   };
 
