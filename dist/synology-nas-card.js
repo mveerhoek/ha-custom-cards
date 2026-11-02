@@ -439,7 +439,48 @@
 
     registerCard("synology-nas-card", SynologyNasCard, {
       name: "Synology NAS",
-      description: "Synology NAS status, volumes and disk overview"
+      description: "Synology NAS status, volumes and disk overview",
+      editor: {
+        schema: [
+          { name: "name", required: true, selector: { text: {} } },
+          { name: "temperature", selector: { entity: { domain: "sensor" } } },
+          { name: "security", selector: { entity: {} } },
+          { name: "cpu", selector: { entity: { domain: "sensor" } } },
+          { name: "memory", selector: { entity: { domain: "sensor" } } },
+          { name: "network_rx", selector: { entity: { domain: "sensor" } } },
+          { name: "network_tx", selector: { entity: { domain: "sensor" } } },
+          { name: "volumes", selector: { object: {} } },
+          { name: "css_url", selector: { text: {} } }
+        ],
+        labels: {
+          name: "Naam van de NAS",
+          temperature: "Temperatuur",
+          security: "Beveiliging",
+          cpu: "CPU-gebruik",
+          memory: "RAM-gebruik",
+          network_rx: "Netwerk download (Rx)",
+          network_tx: "Netwerk upload (Tx)",
+          volumes: "Volumes en schijven (YAML-lijst)",
+          css_url: "Pad naar stylesheet (optioneel)"
+        },
+        helpers: {
+          volumes: "Per volume: name, used, size, status en disks (name, type, temperature, status).",
+          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
+        },
+        example: [
+          "volumes:",
+          "  - name: Volume 1",
+          "    used: sensor.volume_1_used",
+          "    size: sensor.volume_1_size",
+          "    status: sensor.volume_1_status",
+          "    disks:",
+          "      - name: Schijf 1",
+          "        type: hdd                       # hdd of ssd",
+          "        temperature: sensor.disk_1_temperature",
+          "        status: sensor.disk_1_status"
+        ].join("\n")
+      },
+      stubConfig: { name: "NAS" }
     });
   };
 
