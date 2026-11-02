@@ -270,7 +270,50 @@
 
     registerCard("custom-network-infrastructure-card", CustomNetworkInfrastructureCard, {
       name: "Custom Network Infrastructure Card",
-      description: "Gedetailleerde netwerkkaart met router status badge, aangesloten gebruikers en een uitklapbare lijst met hardware statistieken en IP trackers."
+      description: "Gedetailleerde netwerkkaart met router status badge, aangesloten gebruikers en een uitklapbare lijst met hardware statistieken en IP trackers.",
+      editor: {
+        schema: [
+          { name: "name", required: true, selector: { text: {} } },
+          { name: "router_status_entity", selector: { entity: {} } },
+          { name: "wan_ip_tracker", selector: { entity: { domain: "device_tracker" } } },
+          { name: "networks", selector: { object: {} } },
+          { name: "devices", selector: { object: {} } },
+          { name: "css_url", selector: { text: {} } }
+        ],
+        labels: {
+          name: "Naam",
+          router_status_entity: "Router status (on/off)",
+          wan_ip_tracker: "Device tracker voor het WAN IP-adres",
+          networks: "Netwerken (YAML-lijst)",
+          devices: "Apparaten (YAML-lijst)",
+          css_url: "Pad naar stylesheet (optioneel)"
+        },
+        helpers: {
+          wan_ip_tracker: "Het IP-adres wordt gelezen uit het attribuut ip.",
+          networks: "Per netwerk: name, type (wlan of lan) en connected_users.",
+          devices: "Per apparaat: name, type, device_tracker, cpu, memory en restart_action.",
+          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
+        },
+        example: [
+          "networks:",
+          "  - name: WiFi",
+          "    type: wlan                          # wlan of lan",
+          "    connected_users: sensor.wifi_users  # of een lijst met sensoren (wordt opgeteld)",
+          "devices:",
+          "  - name: Router",
+          "    type: router                        # router, switch of ap",
+          "    device_tracker: device_tracker.router",
+          "    ip: 192.168.1.1                     # alleen zonder device_tracker",
+          "    cpu: sensor.router_cpu",
+          "    memory: sensor.router_memory",
+          "    restart_action:",
+          "      action: perform-action",
+          "      perform_action: button.press",
+          "      target:",
+          "        entity_id: button.router_restart"
+        ].join("\n")
+      },
+      stubConfig: { name: "Netwerk" }
     });
   };
 
