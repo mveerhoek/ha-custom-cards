@@ -508,7 +508,35 @@
 
     registerCard("docker-combined-card", DockerCombinedCard, {
       name: "Docker Combined",
-      description: "Docker overzicht met uitklapbare projecten en containers"
+      description: "Docker overzicht met uitklapbare projecten en containers",
+      editor: {
+        schema: [
+          { name: "entity_prefix", selector: { text: {} } },
+          { name: "projects", selector: { object: {} } },
+          { name: "css_url", selector: { text: {} } }
+        ],
+        labels: {
+          entity_prefix: "Voorvoegsel van de entiteiten",
+          projects: "Projecten (YAML-lijst)",
+          css_url: "Pad naar stylesheet (optioneel)"
+        },
+        helpers: {
+          entity_prefix: "Standaard unraid_docker_ (switch.unraid_docker_<container>).",
+          projects: "Per project: name en containers. Overige containers komen in Other.",
+          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
+        },
+        example: [
+          "projects:",
+          "  - name: Media",
+          "    containers:",
+          "      - plex",
+          "      - sonarr",
+          "  - name: Tools",
+          "    containers:",
+          "      - ghost"
+        ].join("\n")
+      },
+      stubConfig: {}
     });
   };
 
