@@ -348,11 +348,21 @@
         });
       }
 
-      cardClass.getConfigElement = () => document.createElement(editorTag);
+      // Zorg dat getConfigElement écht een statische methode wordt
+      Object.defineProperty(cardClass, 'getConfigElement', {
+        value: () => document.createElement(editorTag),
+        configurable: true,
+        writable: true
+      });
     }
 
     if (stubConfig) {
-      cardClass.getStubConfig = () => JSON.parse(JSON.stringify(stubConfig));
+      // Zorg dat getStubConfig écht een statische methode wordt
+      Object.defineProperty(cardClass, 'getStubConfig', {
+        value: () => JSON.parse(JSON.stringify(stubConfig)),
+        configurable: true,
+        writable: true
+      });
     }
 
     window.customCards = window.customCards || [];
