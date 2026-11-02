@@ -10,8 +10,9 @@
    klaar is voordat hij zichzelf registreert.
 
    Inhoud (window.CustomCardsShared):
-     - CardBase     basisklasse met de gedeelde methodes
-     - registerCard registreert een kaart in Home Assistant
+     - CardBase       basisklasse met de gedeelde methodes
+     - CardEditorBase basis voor de visuele editor (ha-form) van een kaart
+     - registerCard   registreert een kaart (en eventueel de editor) in Home Assistant
    ========================================================================== */
 
 (() => {
@@ -21,10 +22,9 @@
   // De gedeelde stylesheet staat naast dit bestand. Wordt het script als module
   // geladen, dan is de locatie onbekend en geldt /local/custom-cards-shared.css.
   // Per kaart te overschrijven met css_url in de kaartconfiguratie.
-  const CSS_URL = new URL(
-    "./custom-cards-shared.css",
-    import.meta.url
-  ).href;
+  const CSS_URL = document.currentScript?.src
+    ? new URL("custom-cards-shared.css", document.currentScript.src).href
+    : "/local/custom-cards-shared.css";
 
   class CardBase extends HTMLElement {
     // ----- Levenscyclus -----
@@ -212,17 +212,153 @@
     }
   }
 
-  // Registreert een kaart bij de browser en in de kaartkiezer van Home Assistant
-  const registerCard = (tag, cardClass, { name, description }) => {
+  // ==========================================================================
+  // Visuele editor
+  //
+  // Een editor bestaat uit een ha-form met losse velden (entiteiten, tekst, keuzes)
+  // en uit "object"-velden voor de lijsten (netwerken, apparaten, volumes, projecten).
+  // Een object-veld toont een YAML-vak in de editor. Elke kaart levert zijn eigen
+  // schema, labels en voorbeeld aan via registerCard().
+  // ==========================================================================
+
+  class CardEditorBase extends HTMLElement {
+    setConfig(config) {
+      this._config = config;
+      this._render();
+    }
+
+    set hass(hass) {
+      this._hass = hass;
+      if (this._form) this._form.hass = hass;
+    }
+
+    _render() {
+      if (!this._form) this._create();
+
+      this._form.hass = this._hass;
+      this._form.data = this._config;
+    }
+
+    _create() {
+      const { SCHEMA, LABELS, HELPERS, EXAMPLE } = this.constructor;
+
+      const form = document.createElement("ha-form");
+      form.schema = SCHEMA;
+      form.computeLabel = (field) => LABELS[field.name] ?? field.name;
+      form.computeHelper = (field) => HELPERS[field.name] ?? "";
+      form.addEventListener("value-changed", (event) => this._valueChanged(event));
+
+      // Melding als een lijst geen YAML-lijst is
+      const warning = document.createElement("div");
+      warning.hidden = true;
+      warning.style.cssText =
+        "color: var(--error-color, #db4437); font-size: 12px; margin: 4px 0 8px;";
+      warning.textContent =
+        "Een lijst moet in YAML beginnen met een streepje (- ). De wijziging is nog niet toegepast.";
+
+      this.append(form, warning);
+
+      // Voorbeeld van de structuur van de lijsten
+      if (EXAMPLE) {
+        const details = document.createElement("details");
+        details.style.cssText = "margin-top: 8px;";
+
+        const summary = document.createElement("summary");
+        summary.textContent = "Voorbeeld van de lijsten (YAML)";
+        summary.style.cssText = "cursor: pointer; color: var(--secondary-text-color); font-size: 13px;";
+
+        const pre = document.createElement("pre");
+        pre.textContent = EXAMPLE;
+        pre.style.cssText =
+          "margin: 8px 0 0; padding: 8px; overflow: auto; font-size: 12px; " +
+          "border-radius: 6px; background: var(--secondary-background-color); " +
+          "color: var(--primary-text-color);";
+
+        details.append(summary, pre);
+        this.append(details);
+      }
+
+      this._form = form;
+      this._warning = warning;
+    }
+
+    _valueChanged(event) {
+      event.stopPropagation();
+
+      const incoming = event.detail?.value;
+      if (!incoming) return;
+
+      const listKeys = this.constructor.LIST_KEYS;
+
+      // Lijsten moeten arrays zijn; een leeg object (leeg YAML-vak) telt als leeg
+      const isEmptyObject = (v) =>
+        v && typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length;
+
+      const invalid = listKeys.filter((key) => {
+        const v = incoming[key];
+        return v !== undefined && v !== null && v !== "" &&
+          !Array.isArray(v) && !isEmptyObject(v);
+      });
+
+      this._warning.hidden = invalid.length === 0;
+      if (invalid.length) return;
+
+      // Lege waarden weglaten, zodat de YAML-configuratie schoon blijft
+      const config = {};
+
+      for (const [key, value] of Object.entries({ ...this._config, ...incoming })) {
+        if (value === undefined || value === null || value === "") continue;
+        if (isEmptyObject(value)) continue;
+        if (Array.isArray(value) && !value.length && listKeys.includes(key)) continue;
+
+        config[key] = value;
+      }
+
+      this._config = config;
+
+      this.dispatchEvent(new CustomEvent("config-changed", {
+        detail: { config },
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
+  // Registreert een kaart bij de browser en in de kaartkiezer van Home Assistant.
+  // Met editor (schema, labels, helpers, example) krijgt de kaart ook een visuele
+  // editor; stubConfig is de startconfiguratie bij het toevoegen van de kaart.
+  const registerCard = (tag, cardClass, { name, description, editor, stubConfig }) => {
     if (!customElements.get(tag)) {
       customElements.define(tag, cardClass);
+    }
+
+    if (editor) {
+      const editorTag = `${tag}-editor`;
+
+      if (!customElements.get(editorTag)) {
+        customElements.define(editorTag, class extends CardEditorBase {
+          static SCHEMA = editor.schema;
+          static LABELS = editor.labels || {};
+          static HELPERS = editor.helpers || {};
+          static EXAMPLE = editor.example || "";
+          static LIST_KEYS = editor.schema
+            .filter((field) => field.selector?.object)
+            .map((field) => field.name);
+        });
+      }
+
+      cardClass.getConfigElement = () => document.createElement(editorTag);
+    }
+
+    if (stubConfig) {
+      cardClass.getStubConfig = () => JSON.parse(JSON.stringify(stubConfig));
     }
 
     window.customCards = window.customCards || [];
     window.customCards.push({ type: tag, name, description });
   };
 
-  window.CustomCardsShared = { CardBase, registerCard };
+  window.CustomCardsShared = { CardBase, CardEditorBase, registerCard };
 
   // Markeert dat de helpers klaar zijn: de kaarten wachten hierop
   customElements.define("custom-cards-shared", class extends HTMLElement {});
