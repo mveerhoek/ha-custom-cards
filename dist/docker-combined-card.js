@@ -9,12 +9,12 @@
           const name = project.name || project.project;
 
           if (!name) {
-            throw new Error(`Project ${index + 1}: geef een naam op via name.`);
+            throw new Error(`Project ${index + 1}: set a name using the name option.`);
           }
 
           if (!Array.isArray(project.containers) || !project.containers.length) {
             throw new Error(
-              `Project "${name}": geef minimaal één container op via containers.`
+              `Project "${name}": add at least one container using the containers option.`
             );
           }
 
@@ -44,8 +44,11 @@
         header.className = "header";
         header.setAttribute("role", "button");
         header.setAttribute("tabindex", "0");
-        header.setAttribute("aria-expanded", "false");
-        header.setAttribute("aria-label", "Toon Docker projecten");
+        header.setAttribute("aria-expanded", String(this._expanded));
+        header.setAttribute(
+          "aria-label",
+          this._t(this._expanded ? "docker.hide_projects" : "docker.show_projects")
+        );
 
         const icon = document.createElement("ha-icon");
         icon.className = "card-icon";
@@ -92,9 +95,9 @@
           return { metric, value };
         };
 
-        const containersMetric = createMetric("Containers actief");
-        const cpuMetric = createMetric("CPU-gebruik");
-        const memoryMetric = createMetric("Geheugengebruik");
+        const containersMetric = createMetric(this._t("docker.metric.containers"));
+        const cpuMetric = createMetric(this._t("docker.metric.cpu"));
+        const memoryMetric = createMetric(this._t("docker.metric.memory"));
 
         metrics.append(
           containersMetric.metric,
@@ -105,14 +108,14 @@
         // Projectenlijst
         const projectList = document.createElement("div");
         projectList.className = "projects";
-        projectList.hidden = true;
+        projectList.hidden = !this._expanded;
 
         // Projecten uit de configuratie + virtueel project "Other"
         this._projects = this._config.projects.map(project =>
           this._createProject(project.name, project.containers)
         );
 
-        this._otherProject = this._createProject("Other", []);
+        this._otherProject = this._createProject(this._t("docker.other"), []);
         this._otherProject.el.hidden = true;
         this._otherKey = null;
 
@@ -129,7 +132,7 @@
           header.setAttribute("aria-expanded", String(this._expanded));
           header.setAttribute(
             "aria-label",
-            this._expanded ? "Verberg Docker projecten" : "Toon Docker projecten"
+            this._t(this._expanded ? "docker.hide_projects" : "docker.show_projects")
           );
         };
 
@@ -163,7 +166,7 @@
         header.setAttribute("aria-expanded", String(expanded));
         header.setAttribute(
           "aria-label",
-          `${expanded ? "Verberg" : "Toon"} containers van ${name}`
+          this._t(expanded ? "docker.hide_containers" : "docker.show_containers", { name })
         );
 
         // Bovenste regel: naam links, statusindicator rechts
@@ -198,7 +201,7 @@
           header.setAttribute("aria-expanded", String(next));
           header.setAttribute(
             "aria-label",
-            `${next ? "Verberg" : "Toon"} containers van ${name}`
+            this._t(next ? "docker.hide_containers" : "docker.show_containers", { name })
           );
         };
 
@@ -242,7 +245,7 @@
           const toggleButton = document.createElement("button");
           toggleButton.className = "container-toggle";
           toggleButton.type = "button";
-          toggleButton.setAttribute("aria-label", `Schakel ${name} container`);
+          toggleButton.setAttribute("aria-label", this._t("docker.toggle", { name }));
 
           const toggleIcon = document.createElement("ha-icon");
           toggleButton.append(toggleIcon);
@@ -252,15 +255,14 @@
 
             const turnOff =
               this._hass?.states[`switch.${prefix}${name}`]?.state === "on";
-            const verb = turnOff ? "uitschakelen" : "inschakelen";
-
+            
             this._runAction(
               {
                 action: "perform-action",
                 perform_action: turnOff ? "switch.turn_off" : "switch.turn_on",
                 data: { entity_id: `switch.${prefix}${name}` },
                 confirmation: {
-                  text: `Weet je zeker dat je de container "${name}" wilt ${verb}?`
+                  text: this._t(turnOff ? "docker.confirm_off" : "docker.confirm_on", { name })
                 }
               },
               name
@@ -365,17 +367,18 @@
         // Aantal projecten: de geconfigureerde projecten plus "Other" als die containers heeft
         const projectCount = this._projects.length + (otherNames.length ? 1 : 0);
 
-        this._subtitle.textContent =
-          `${total} ${total === 1 ? "container" : "containers"} in ` +
-          `${projectCount} ${projectCount === 1 ? "project" : "projecten"}`;
+        this._subtitle.textContent = this._t("docker.subtitle", {
+          containers: this._t("docker.container_count", { count: total }),
+          projects: this._t("docker.project_count", { count: projectCount })
+        });
         this._cpuValue.textContent = `${totalCpu.toFixed(1)}%`;
         this._memoryValue.textContent = `${totalMemory.toFixed(0)} MB`;
 
         this._status.textContent =
-          total === 0 ? "Geen containers gevonden" :
-          running === total ? "Alles actief" :
-          running === 0 ? "Alles gestopt" :
-          `${running}/${total} actief`;
+          total === 0 ? this._t("docker.status.none") :
+          running === total ? this._t("docker.status.all_active") :
+          running === 0 ? this._t("docker.status.all_stopped") :
+          this._t("docker.status.partial", { running, total });
 
         this._setBadge(
           this._status,
@@ -437,9 +440,9 @@
           // Container status
           row.state.classList.toggle("running", isRunning);
           row.state.textContent =
-            switchState === "on" ? "Actief" :
-            switchState === "off" ? "Gestopt" :
-            "Onbekend";
+            switchState === "on" ? this._t("status.active") :
+            switchState === "off" ? this._t("status.stopped") :
+            this._t("status.unknown");
 
           // CPU en RAM
           row.cpu.textContent = `${this._format(cpu)}%`;
@@ -454,8 +457,8 @@
           row.toggleButton.setAttribute(
             "aria-label",
             isRunning
-              ? `Schakel ${row.name} container uit`
-              : `Schakel ${row.name} container in`
+              ? this._t("docker.toggle_off", { name: row.name })
+              : this._t("docker.toggle_on", { name: row.name })
           );
         }
 
@@ -475,9 +478,9 @@
         ].join("  ·  ");
 
         project.status.textContent =
-          running === total ? "Alles actief" :
-          running === 0 ? "Alles gestopt" :
-          `${running}/${total} actief`;
+          running === total ? this._t("docker.status.all_active") :
+          running === 0 ? this._t("docker.status.all_stopped") :
+          this._t("docker.status.partial", { running, total });
 
         this._setBadge(
           project.status,
@@ -507,34 +510,15 @@
     }
 
     registerCard("docker-combined-card", DockerCombinedCard, {
+      id: "docker",
       name: "Docker Combined",
-      description: "Docker overzicht met uitklapbare projecten en containers",
+      description: "Docker overview with expandable projects and containers.",
       editor: {
         schema: [
           { name: "entity_prefix", selector: { text: {} } },
           { name: "projects", selector: { object: {} } },
           { name: "css_url", selector: { text: {} } }
-        ],
-        labels: {
-          entity_prefix: "Voorvoegsel van de entiteiten",
-          projects: "Projecten (YAML-lijst)",
-          css_url: "Pad naar stylesheet (optioneel)"
-        },
-        helpers: {
-          entity_prefix: "Standaard unraid_docker_ (switch.unraid_docker_<container>).",
-          projects: "Per project: name en containers. Overige containers komen in Other.",
-          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
-        },
-        example: [
-          "projects:",
-          "  - name: Media",
-          "    containers:",
-          "      - plex",
-          "      - sonarr",
-          "  - name: Tools",
-          "    containers:",
-          "      - ghost"
-        ].join("\n")
+        ]
       },
       stubConfig: {}
     });
@@ -548,7 +532,7 @@
 
     setTimeout(() => {
       if (!customElements.get("custom-cards-shared")) {
-        console.error("docker-combined-card: custom-cards-shared.js is niet geladen. Voeg dat bestand toe als resource.");
+        console.error("docker-combined-card: custom-cards-shared.js is not loaded. Add that file as a resource.");
       }
     }, 5000);
   }
