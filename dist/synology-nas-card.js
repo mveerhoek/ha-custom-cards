@@ -6,7 +6,7 @@
     class SynologyNasCard extends CardBase {
       setConfig(config) {
         if (!config.name) {
-          throw new Error("Geef een NAS-naam op via name.");
+          throw new Error("Set a NAS name using the name option.");
         }
 
         this._config = {
@@ -56,9 +56,9 @@
         // CPU, RAM en temperatuur op de eerste regel: elk apart klikbaar
         this._summaryItems = [];
         [
-          { key: "cpu", label: "CPU", decimals: 1, unit: "%" },
-          { key: "memory", label: "RAM", decimals: 0, unit: "%" },
-          { key: "temperature", label: "Temp", decimals: 1, unit: "°C" }
+          { key: "cpu", label: this._t("label.cpu"), decimals: 1, unit: "%" },
+          { key: "memory", label: this._t("label.ram"), decimals: 0, unit: "%" },
+          { key: "temperature", label: this._t("label.temp"), decimals: 1, unit: "°C" }
         ].forEach((def, index) => {
           if (index > 0) {
             const separator = document.createElement("span");
@@ -162,12 +162,12 @@
         const value = this._getValue(this._config.security);
 
         if (value === null) {
-          return { label: "Onbekend", type: "unknown" };
+          return { label: this._t("status.unknown"), type: "unknown" };
         }
 
         if (value === "off" || value === "on") {
           return {
-            label: value === "on" ? "Waarschuwing" : "Veilig",
+            label: value === "on" ? this._t("status.warning") : this._t("status.safe"),
             type: value === "on" ? "error" : "normal"
           };
         }
@@ -177,13 +177,13 @@
         if (
           ["normal", "safe", "ok", "secure", "veilig"].includes(normalized)
         ) {
-          return { label: "Veilig", type: "normal" };
+          return { label: this._t("status.safe"), type: "normal" };
         }
 
         if (
           ["warning", "warn", "alert", "problem", "unsafe"].includes(normalized)
         ) {
-          return { label: "Waarschuwing", type: "error" };
+          return { label: this._t("status.warning"), type: "error" };
         }
 
         return { label: value, type: "unknown" };
@@ -193,7 +193,7 @@
         const value = this._getValue(entityId);
 
         if (value === null) {
-          return { label: "Onbekend", type: "unknown" };
+          return { label: this._t("status.unknown"), type: "unknown" };
         }
 
         const normalized = value.toLowerCase();
@@ -201,19 +201,19 @@
         if (
           ["normal", "healthy", "ok", "initialized", "active"].includes(normalized)
         ) {
-          return { label: "Normaal", type: "normal" };
+          return { label: this._t("status.normal"), type: "normal" };
         }
 
         if (
           ["warning", "attention", "degraded", "repairing"].includes(normalized)
         ) {
-          return { label: "Waarschuwing", type: "warning" };
+          return { label: this._t("status.warning"), type: "warning" };
         }
 
         if (
           ["critical", "crashed", "failing", "failed", "error"].includes(normalized)
         ) {
-          return { label: "Fout", type: "error" };
+          return { label: this._t("status.error"), type: "error" };
         }
 
         return { label: value, type: "unknown" };
@@ -227,7 +227,7 @@
         if (!this._config.volumes.length) {
           const empty = document.createElement("div");
           empty.className = "empty";
-          empty.textContent = "Geen volumes geconfigureerd";
+          empty.textContent = this._t("synology.no_volumes");
           this._volumeList.append(empty);
           return;
         }
@@ -345,7 +345,7 @@
             const tempValue = this._getNumber(disk.temperature);
             const tempUnit = this._getUnit(disk.temperature, "°C");
             diskEl.temperature.textContent = tempValue === null
-              ? "Onbekend"
+              ? this._t("status.unknown")
               : `${this._formatNumber(tempValue, 0)} ${tempUnit}`;
 
             const diskStatus = this._getDiskStatus(disk.status);
@@ -370,7 +370,7 @@
         });
 
         // Beveiliging onder de statusindicator
-        this._security.textContent = `Beveiliging ${security.label}`;
+        this._security.textContent = this._t("synology.security", { status: security.label });
 
         // Network traffic
         this._rxValue.textContent = this._formatSensor(
@@ -410,11 +410,11 @@
         let overallStatus;
 
         if (hasError) {
-          overallStatus = { label: "Probleem", type: "error" };
+          overallStatus = { label: this._t("synology.overall.problem"), type: "error" };
         } else if (hasWarning || hasUnknown) {
-          overallStatus = { label: "Controleer", type: "warning" };
+          overallStatus = { label: this._t("synology.overall.check"), type: "warning" };
         } else {
-          overallStatus = { label: "Normaal", type: "success" };
+          overallStatus = { label: this._t("synology.overall.normal"), type: "success" };
         }
 
         this._setBadge(this._status, overallStatus.type, overallStatus.label);
@@ -438,8 +438,9 @@
     }
 
     registerCard("synology-nas-card", SynologyNasCard, {
+      id: "synology",
       name: "Synology NAS",
-      description: "Synology NAS status, volumes and disk overview",
+      description: "Synology NAS status, volumes and disk overview.",
       editor: {
         schema: [
           { name: "name", required: true, selector: { text: {} } },
@@ -451,34 +452,7 @@
           { name: "network_tx", selector: { entity: { domain: "sensor" } } },
           { name: "volumes", selector: { object: {} } },
           { name: "css_url", selector: { text: {} } }
-        ],
-        labels: {
-          name: "Naam van de NAS",
-          temperature: "Temperatuur",
-          security: "Beveiliging",
-          cpu: "CPU-gebruik",
-          memory: "RAM-gebruik",
-          network_rx: "Netwerk download (Rx)",
-          network_tx: "Netwerk upload (Tx)",
-          volumes: "Volumes en schijven (YAML-lijst)",
-          css_url: "Pad naar stylesheet (optioneel)"
-        },
-        helpers: {
-          volumes: "Per volume: name, used, size, status en disks (name, type, temperature, status).",
-          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
-        },
-        example: [
-          "volumes:",
-          "  - name: Volume 1",
-          "    used: sensor.volume_1_used",
-          "    size: sensor.volume_1_size",
-          "    status: sensor.volume_1_status",
-          "    disks:",
-          "      - name: Schijf 1",
-          "        type: hdd                       # hdd of ssd",
-          "        temperature: sensor.disk_1_temperature",
-          "        status: sensor.disk_1_status"
-        ].join("\n")
+        ]
       },
       stubConfig: { name: "NAS" }
     });
@@ -492,7 +466,7 @@
 
     setTimeout(() => {
       if (!customElements.get("custom-cards-shared")) {
-        console.error("synology-nas-card: custom-cards-shared.js is niet geladen. Voeg dat bestand toe als resource.");
+        console.error("synology-nas-card: custom-cards-shared.js is not loaded. Add that file as a resource.");
       }
     }, 5000);
   }

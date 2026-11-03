@@ -6,7 +6,7 @@
     class CustomNetworkInfrastructureCard extends CardBase {
       setConfig(config) {
         if (!config.name) {
-          throw new Error("Geef een naam op via name.");
+          throw new Error("Set a name using the name option.");
         }
 
         this._config = {
@@ -147,7 +147,7 @@
         if (!this._config.devices.length) {
           const empty = document.createElement("div");
           empty.className = "empty";
-          empty.textContent = "Geen apparatuur geconfigureerd";
+          empty.textContent = this._t("network.no_devices");
           this._devicesList.append(empty);
           return;
         }
@@ -162,10 +162,10 @@
 
         this._devicesList.append(
           headerCell(""),
-          headerCell("Name"),
-          headerCell("IP", "col-center"),
-          headerCell("CPU", "col-center"),
-          headerCell("RAM", "col-center"),
+          headerCell(this._t("network.header.name")),
+          headerCell(this._t("network.header.ip"), "col-center"),
+          headerCell(this._t("label.cpu"), "col-center"),
+          headerCell(this._t("label.ram"), "col-center"),
           headerCell("")
         );
 
@@ -202,15 +202,15 @@
             restartCell = document.createElement("button");
             restartCell.className = "restart-btn";
             restartCell.type = "button";
-            restartCell.title = `Herstart ${device.name}`;
-            restartCell.setAttribute("aria-label", `Herstart ${device.name}`);
+            restartCell.title = this._t("network.restart", { name: device.name });
+            restartCell.setAttribute("aria-label", this._t("network.restart", { name: device.name }));
 
             const restartIcon = document.createElement("ha-icon");
             restartIcon.icon = "mdi:restart";
             restartCell.append(restartIcon);
 
             restartCell.addEventListener("click", () =>
-              this._runAction(device.restart_action, device.name, "herstarten")
+              this._runAction(device.restart_action, this._t("network.restart_confirm", { name: device.name }))
             );
           } else {
             restartCell = document.createElement("div");
@@ -228,29 +228,29 @@
         // Update hoofd router status rechtsboven
         const routerStatus = this._getValue(this._config.router_status_entity);
         const [routerType, routerLabel] =
-          routerStatus === "on" ? ["success", "Online"] :
-          routerStatus === "off" ? ["error", "Offline"] :
-          ["warning", "Onbekend"];
+          routerStatus === "on" ? ["success", this._t("status.online")] :
+          routerStatus === "off" ? ["error", this._t("status.offline")] :
+          ["warning", this._t("status.unknown")];
 
         this._setBadge(this._routerStatusBadge, routerType, routerLabel);
 
         // Update WAN IP (uit device_tracker entiteit)
         if (this._config.wan_ip_tracker) {
           const wanIp = this._getTrackerIp(this._config.wan_ip_tracker);
-          this._wanIp.textContent = `WAN: ${wanIp || "Geen IP"}`;
+          this._wanIp.textContent = this._t("network.wan", { ip: wanIp || this._t("network.no_ip") });
         }
 
         // Live update netwerken (Connected Users)
         this._networkElements.forEach((el) => {
           const users = this._getUsersCount(el.config.connected_users);
-          el.textSpan.textContent = `${el.config.name}: ${users} gebruikers`;
+          el.textSpan.textContent = this._t("network.users", { name: el.config.name, count: users });
         });
 
         // Live update apparatuur (IP via tracker, CPU & RAM)
         this._deviceElements.forEach((el) => {
           // Haal IP dynamisch op uit de device_tracker entiteit, of val terug op statische IP uit config
           const trackerIp = this._getTrackerIp(el.config.device_tracker);
-          el.ipSpan.textContent = trackerIp || el.config.ip || "Geen IP";
+          el.ipSpan.textContent = trackerIp || el.config.ip || this._t("network.no_ip");
 
           const cpuVal = this._getValue(el.config.cpu);
           const ramVal = this._getValue(el.config.memory);
@@ -269,8 +269,9 @@
     }
 
     registerCard("custom-network-infrastructure-card", CustomNetworkInfrastructureCard, {
+      id: "network",
       name: "Custom Network Infrastructure Card",
-      description: "Gedetailleerde netwerkkaart met router status badge, aangesloten gebruikers en een uitklapbare lijst met hardware statistieken en IP trackers.",
+      description: "Detailed network card with router status badge, connected users and an expandable list of hardware statistics and IP trackers.",
       editor: {
         schema: [
           { name: "name", required: true, selector: { text: {} } },
@@ -279,39 +280,7 @@
           { name: "networks", selector: { object: {} } },
           { name: "devices", selector: { object: {} } },
           { name: "css_url", selector: { text: {} } }
-        ],
-        labels: {
-          name: "Naam",
-          router_status_entity: "Router status (on/off)",
-          wan_ip_tracker: "Device tracker voor het WAN IP-adres",
-          networks: "Netwerken (YAML-lijst)",
-          devices: "Apparaten (YAML-lijst)",
-          css_url: "Pad naar stylesheet (optioneel)"
-        },
-        helpers: {
-          wan_ip_tracker: "Het IP-adres wordt gelezen uit het attribuut ip.",
-          networks: "Per netwerk: name, type (wlan of lan) en connected_users.",
-          devices: "Per apparaat: name, type, device_tracker, cpu, memory en restart_action.",
-          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
-        },
-        example: [
-          "networks:",
-          "  - name: WiFi",
-          "    type: wlan                          # wlan of lan",
-          "    connected_users: sensor.wifi_users  # of een lijst met sensoren (wordt opgeteld)",
-          "devices:",
-          "  - name: Router",
-          "    type: router                        # router, switch of ap",
-          "    device_tracker: device_tracker.router",
-          "    ip: 192.168.1.1                     # alleen zonder device_tracker",
-          "    cpu: sensor.router_cpu",
-          "    memory: sensor.router_memory",
-          "    restart_action:",
-          "      action: perform-action",
-          "      perform_action: button.press",
-          "      target:",
-          "        entity_id: button.router_restart"
-        ].join("\n")
+        ]
       },
       stubConfig: { name: "Netwerk" }
     });
@@ -325,7 +294,7 @@
 
     setTimeout(() => {
       if (!customElements.get("custom-cards-shared")) {
-        console.error("custom-network-infrastructure-card: custom-cards-shared.js is niet geladen. Voeg dat bestand toe als resource.");
+        console.error("custom-network-infrastructure-card: custom-cards-shared.js is not loaded. Add that file as a resource.");
       }
     }, 5000);
   }

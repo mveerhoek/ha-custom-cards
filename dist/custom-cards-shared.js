@@ -9,6 +9,12 @@
    De volgorde van laden maakt niet uit: elke kaart wacht tot dit bestand
    klaar is voordat hij zichzelf registreert.
 
+   Vertalingen
+     De teksten van de kaarten staan in losse bestanden, een per taal, in de map
+     custom-cards-translations (naast dit bestand): nl.json, en.json, ...
+     De taal volgt de taal van Home Assistant. Ontbreekt een vertaling, dan wordt
+     Engels gebruikt (en.json). Een taal toevoegen = een nieuw <taal>.json plaatsen.
+
    Inhoud (window.CustomCardsShared):
      - CardBase       basisklasse met de gedeelde methodes
      - CardEditorBase basis voor de visuele editor (ha-form) van een kaart
@@ -19,20 +25,116 @@
   // Voorkomt problemen als dit bestand dubbel wordt geladen
   if (customElements.get("custom-cards-shared")) return;
 
-  // De gedeelde stylesheet staat naast dit bestand. Wordt het script als module
-  // geladen, dan is de locatie onbekend en geldt /local/custom-cards-shared.css.
-  // Per kaart te overschrijven met css_url in de kaartconfiguratie.
-  const CSS_URL = new URL(
-    "./custom-cards-shared.css",
-    import.meta.url
-  ).href;
+  // De stylesheet en de vertalingen staan naast dit bestand. Wordt het script als
+  // module geladen, dan is de locatie onbekend en geldt /local/. De stylesheet is per
+  // kaart te overschrijven met css_url in de kaartconfiguratie.
+  const BASE_URL = document.currentScript?.src
+    ? new URL(".", document.currentScript.src).href
+    : "/local/";
+
+  const CSS_URL = new URL("custom-cards-shared.css", new URL(BASE_URL, location.href)).href;
+  const TRANSLATIONS_URL = new URL("custom-cards-translations/", new URL(BASE_URL, location.href)).href;
+  const FALLBACK_LANGUAGE = "en";
+
+  // ==========================================================================
+  // Vertalingen
+  // ==========================================================================
+
+  const fileCache = new Map();
+  const stringsCache = new Map();
+
+  const fetchLanguageFile = (language) => {
+    if (!fileCache.has(language)) {
+      fileCache.set(language, fetch(`${TRANSLATIONS_URL}${language}.json`)
+        .then((response) => (response.ok ? response.json() : null))
+        .catch(() => null));
+    }
+    return fileCache.get(language);
+  };
+
+  // Laadt de teksten voor een taal. Volgorde (de laatste wint): Engels, de basistaal
+  // (pt voor pt-BR) en daarna de exacte taal.
+  const loadStrings = (language) => {
+    if (!stringsCache.has(language)) {
+      const languages = [...new Set([FALLBACK_LANGUAGE, language.split("-")[0], language])];
+
+      stringsCache.set(language, Promise.all(languages.map(fetchLanguageFile)).then((files) => {
+        const strings = Object.assign({}, ...files.filter(Boolean));
+
+        if (!Object.keys(strings).length) {
+          console.error(`custom-cards: no translations found in ${TRANSLATIONS_URL}`);
+        }
+
+        return strings;
+      }));
+    }
+    return stringsCache.get(language);
+  };
+
+  // Methodes die zowel de kaarten als de editors gebruiken
+  const i18n = {
+    // Zodra Home Assistant een nieuwe taal doorgeeft, worden de teksten geladen
+    _ensureLanguage() {
+      const language = this._hass?.locale?.language || this._hass?.language || FALLBACK_LANGUAGE;
+
+      if (language === this._language) return;
+
+      this._language = language;
+
+      loadStrings(language).then((strings) => {
+        if (this._language !== language) return;
+
+        this._strings = strings;
+        this._onStringsLoaded();
+      });
+    },
+
+    _has(key) {
+      return this._strings?.[key] !== undefined;
+    },
+
+    // Vertaalde tekst. {naam} in de tekst wordt vervangen door params.naam.
+    // Met params.count wordt de meervoudsvorm gekozen: key_one, key_other, ...
+    _t(key, params = {}) {
+      const strings = this._strings || {};
+      let template = strings[key];
+
+      if (params.count !== undefined) {
+        let rule = "other";
+
+        try {
+          rule = new Intl.PluralRules(this._language || FALLBACK_LANGUAGE).select(Number(params.count));
+        } catch (err) {
+          // onbekende taalcode: meervoud
+        }
+
+        template = strings[`${key}_${rule}`] ?? strings[`${key}_other`] ?? template;
+      }
+
+      if (template === undefined) return key;
+
+      return template.replace(/\{(\w+)\}/g, (match, name) => params[name] ?? match);
+    }
+  };
+
+  // ==========================================================================
+  // Kaarten
+  // ==========================================================================
 
   class CardBase extends HTMLElement {
     // ----- Levenscyclus -----
 
     set hass(hass) {
       this._hass = hass;
-      this._update();
+      this._ensureLanguage();
+
+      // Pas bijwerken zodra de teksten geladen zijn
+      if (this._strings) this._update();
+    }
+
+    // Teksten zijn (opnieuw) geladen: de kaart wordt opnieuw opgebouwd
+    _onStringsLoaded() {
+      this._build();
     }
 
     // Eerste stap van _build(): false als er nog geen configuratie is
@@ -47,19 +149,22 @@
     }
 
     // Koppelt de gedeelde stylesheet en plaatst de kaart. De kaart blijft verborgen
-    // tot de stylesheet geladen is, zodat er geen kaart zonder opmaak oplicht.
+    // tot de stylesheet en de vertalingen geladen zijn, zodat er geen kaart zonder
+    // opmaak of zonder tekst oplicht.
     _setContent(card) {
       const link = document.createElement("link");
       link.rel = "stylesheet";
       link.href = this._config.css_url || CSS_URL;
 
-      const reveal = () => { card.style.visibility = ""; };
+      const reveal = () => {
+        if (this._strings) card.style.visibility = "";
+      };
 
       card.style.visibility = "hidden";
       link.addEventListener("load", reveal);
       link.addEventListener("error", () => {
-        console.error(`${this.localName}: stylesheet niet gevonden: ${link.href}`);
-        reveal();
+        console.error(`${this.localName}: stylesheet not found: ${link.href}`);
+        if (this._strings) card.style.visibility = "";
       });
 
       this.shadowRoot.replaceChildren(link, card);
@@ -101,13 +206,13 @@
     // ----- Opmaak van waarden -----
 
     _formatNumber(value, decimals = 0) {
-      return value === null ? "Onbekend" : Number(value).toFixed(decimals);
+      return value === null ? this._t("status.unknown") : Number(value).toFixed(decimals);
     }
 
     _formatSensor(entityId, decimals = 1, fallbackUnit = "") {
       const value = this._getNumber(entityId);
 
-      if (value === null) return "Onbekend";
+      if (value === null) return this._t("status.unknown");
 
       const unit = this._getUnit(entityId, fallbackUnit);
 
@@ -166,9 +271,8 @@
     // Voert een Home Assistant-actie uit. Ondersteunt: perform-action / call-service,
     // more-info, navigate en url. Service-acties vragen standaard om bevestiging;
     // uit te zetten met confirmation: false, de tekst aan te passen met
-    // confirmation: { text: "..." }. Zonder eigen tekst wordt de vraag
-    // "Weet je zeker dat je <naam> wilt <werkwoord>?".
-    async _runAction(actionConfig, name, verb = "uitvoeren") {
+    // confirmation: { text: "..." }. confirmText is de (vertaalde) standaardvraag.
+    async _runAction(actionConfig, confirmText) {
       if (!actionConfig || !this._hass) return;
 
       const type = actionConfig.action || "perform-action";
@@ -176,7 +280,7 @@
 
       const confirmation = actionConfig.confirmation ?? isService;
       if (confirmation) {
-        const text = actionConfig.confirmation?.text || `Weet je zeker dat je ${name} wilt ${verb}?`;
+        const text = actionConfig.confirmation?.text || confirmText || this._t("action.confirm");
         if (!window.confirm(text)) return;
       }
 
@@ -185,7 +289,7 @@
         case "call-service": {
           const service = actionConfig.perform_action || actionConfig.service;
           if (!service || !service.includes(".")) {
-            console.warn("Geef perform_action op als 'domein.actie'", actionConfig);
+            console.warn("Set perform_action as 'domain.action'", actionConfig);
             return;
           }
           const [domain, serviceName] = service.split(".");
@@ -193,7 +297,7 @@
           try {
             await this._hass.callService(domain, serviceName, data, actionConfig.target);
           } catch (err) {
-            console.error(`Actie ${service} mislukt:`, err);
+            console.error(`Action ${service} failed:`, err);
           }
           break;
         }
@@ -219,7 +323,8 @@
   // Een editor bestaat uit een ha-form met losse velden (entiteiten, tekst, keuzes)
   // en uit "object"-velden voor de lijsten (netwerken, apparaten, volumes, projecten).
   // Een object-veld toont een YAML-vak in de editor. Elke kaart levert zijn eigen
-  // schema, labels en voorbeeld aan via registerCard().
+  // schema aan via registerCard(); labels, uitleg en voorbeeld staan in de
+  // vertaalbestanden onder editor.<kaart-id>.<veld>.
   // ==========================================================================
 
   class CardEditorBase extends HTMLElement {
@@ -230,23 +335,43 @@
 
     set hass(hass) {
       this._hass = hass;
+      this._ensureLanguage();
+
       if (this._form) this._form.hass = hass;
     }
 
+    // Teksten zijn (opnieuw) geladen: het formulier wordt opnieuw opgebouwd
+    _onStringsLoaded() {
+      this._form = null;
+      this.replaceChildren();
+      this._render();
+    }
+
     _render() {
+      if (!this._strings || !this._config) return;
+
       if (!this._form) this._create();
 
       this._form.hass = this._hass;
       this._form.data = this._config;
     }
 
-    _create() {
-      const { SCHEMA, LABELS, HELPERS, EXAMPLE } = this.constructor;
+    // Tekst voor een veld: eerst de tekst van de kaart, dan de gedeelde tekst
+    _fieldText(name, suffix = "") {
+      const id = this.constructor.CARD_ID;
 
+      for (const key of [`editor.${id}.${name}${suffix}`, `editor.${name}${suffix}`]) {
+        if (this._has(key)) return this._t(key);
+      }
+
+      return suffix ? "" : name;
+    }
+
+    _create() {
       const form = document.createElement("ha-form");
-      form.schema = SCHEMA;
-      form.computeLabel = (field) => LABELS[field.name] ?? field.name;
-      form.computeHelper = (field) => HELPERS[field.name] ?? "";
+      form.schema = this.constructor.SCHEMA;
+      form.computeLabel = (field) => this._fieldText(field.name);
+      form.computeHelper = (field) => this._fieldText(field.name, ".help");
       form.addEventListener("value-changed", (event) => this._valueChanged(event));
 
       // Melding als een lijst geen YAML-lijst is
@@ -254,22 +379,23 @@
       warning.hidden = true;
       warning.style.cssText =
         "color: var(--error-color, #db4437); font-size: 12px; margin: 4px 0 8px;";
-      warning.textContent =
-        "Een lijst moet in YAML beginnen met een streepje (- ). De wijziging is nog niet toegepast.";
+      warning.textContent = this._t("editor.warning_list");
 
       this.append(form, warning);
 
       // Voorbeeld van de structuur van de lijsten
-      if (EXAMPLE) {
+      const exampleKey = `editor.${this.constructor.CARD_ID}.example`;
+
+      if (this._has(exampleKey)) {
         const details = document.createElement("details");
         details.style.cssText = "margin-top: 8px;";
 
         const summary = document.createElement("summary");
-        summary.textContent = "Voorbeeld van de lijsten (YAML)";
+        summary.textContent = this._t("editor.example_title");
         summary.style.cssText = "cursor: pointer; color: var(--secondary-text-color); font-size: 13px;";
 
         const pre = document.createElement("pre");
-        pre.textContent = EXAMPLE;
+        pre.textContent = this._t(exampleKey);
         pre.style.cssText =
           "margin: 8px 0 0; padding: 8px; overflow: auto; font-size: 12px; " +
           "border-radius: 6px; background: var(--secondary-background-color); " +
@@ -325,10 +451,14 @@
     }
   }
 
+  Object.assign(CardBase.prototype, i18n);
+  Object.assign(CardEditorBase.prototype, i18n);
+
   // Registreert een kaart bij de browser en in de kaartkiezer van Home Assistant.
-  // Met editor (schema, labels, helpers, example) krijgt de kaart ook een visuele
-  // editor; stubConfig is de startconfiguratie bij het toevoegen van de kaart.
-  const registerCard = (tag, cardClass, { name, description, editor, stubConfig }) => {
+  // Met editor ({ schema }) krijgt de kaart ook een visuele editor; id is de naam waaronder
+  // de teksten van de editor in de vertaalbestanden staan; stubConfig is de
+  // startconfiguratie bij het toevoegen van de kaart.
+  const registerCard = (tag, cardClass, { id, name, description, editor, stubConfig }) => {
     if (!customElements.get(tag)) {
       customElements.define(tag, cardClass);
     }
@@ -338,31 +468,19 @@
 
       if (!customElements.get(editorTag)) {
         customElements.define(editorTag, class extends CardEditorBase {
+          static CARD_ID = id;
           static SCHEMA = editor.schema;
-          static LABELS = editor.labels || {};
-          static HELPERS = editor.helpers || {};
-          static EXAMPLE = editor.example || "";
           static LIST_KEYS = editor.schema
             .filter((field) => field.selector?.object)
             .map((field) => field.name);
         });
       }
 
-      // Zorg dat getConfigElement écht een statische methode wordt
-      Object.defineProperty(cardClass, 'getConfigElement', {
-        value: () => document.createElement(editorTag),
-        configurable: true,
-        writable: true
-      });
+      cardClass.getConfigElement = () => document.createElement(editorTag);
     }
 
     if (stubConfig) {
-      // Zorg dat getStubConfig écht een statische methode wordt
-      Object.defineProperty(cardClass, 'getStubConfig', {
-        value: () => JSON.parse(JSON.stringify(stubConfig)),
-        configurable: true,
-        writable: true
-      });
+      cardClass.getStubConfig = () => JSON.parse(JSON.stringify(stubConfig));
     }
 
     window.customCards = window.customCards || [];
