@@ -6,7 +6,7 @@
     class CustomDesktopCard extends CardBase {
       setConfig(config) {
         if (!config.name) {
-          throw new Error("Geef een naam op via name.");
+          throw new Error("Set a name using the name option.");
         }
 
         this._config = {
@@ -51,9 +51,9 @@
         // CPU, RAM en temperatuur: elk apart klikbaar
         this._summaryItems = [];
         [
-          { key: "cpu", label: "CPU", decimals: 1, unit: "%" },
-          { key: "memory", label: "RAM", decimals: 0, unit: "%" },
-          { key: "temperature", label: "Temp", decimals: 1, unit: "°C" }
+          { key: "cpu", label: this._t("label.cpu"), decimals: 1, unit: "%" },
+          { key: "memory", label: this._t("label.ram"), decimals: 0, unit: "%" },
+          { key: "temperature", label: this._t("label.temp"), decimals: 1, unit: "°C" }
         ].forEach((def, index) => {
           if (index > 0) {
             const separator = document.createElement("span");
@@ -94,20 +94,20 @@
         const value = this._getValue(this._config.device_tracker);
 
         if (value === null) {
-          return { label: "Onbekend", type: "warning" };
+          return { label: this._t("status.unknown"), type: "warning" };
         }
 
         const normalized = value.toLowerCase();
 
         if (["home", "on", "connected"].includes(normalized)) {
-          return { label: "Online", type: "success" };
+          return { label: this._t("status.online"), type: "success" };
         }
 
         if (["not_home", "off", "disconnected"].includes(normalized)) {
-          return { label: "Offline", type: "error" };
+          return { label: this._t("status.offline"), type: "error" };
         }
 
-        return { label: "Onbekend", type: "warning" };
+        return { label: this._t("status.unknown"), type: "warning" };
       }
 
       _update() {
@@ -128,18 +128,20 @@
         const freeVal = this._getNumber(this._config.storage_free);
         const unit = this._getUnit(this._config.storage_used, "GB");
 
-        let storageText = "Opslag Onbekend";
+        let storageValue = this._t("status.unknown");
 
         if (usedVal !== null && freeVal !== null) {
           const totalVal = usedVal + freeVal;
           // Bepaal decimalen op basis van de eenheid (TB heeft vaak 1 of 2 decimalen nodig, GB meestal 0 of 1)
           const decimals = unit.toLowerCase() === "tb" ? 2 : 1;
-      
-          storageText = `Opslag ${usedVal.toFixed(decimals)} ${unit} / ${totalVal.toFixed(decimals)} ${unit}`;
+
+          storageValue = `${usedVal.toFixed(decimals)} ${unit} / ${totalVal.toFixed(decimals)} ${unit}`;
         } else if (usedVal !== null) {
           // Fallback als alleen 'used' beschikbaar is
-          storageText = `Opslag ${usedVal.toFixed(1)} ${unit} / Onbekend`;
+          storageValue = `${usedVal.toFixed(1)} ${unit} / ${this._t("status.unknown")}`;
         }
+
+        const storageText = this._t("desktop.storage", { value: storageValue });
 
         this._summaryRow2.textContent = storageText;
       }
@@ -150,8 +152,9 @@
     }
 
     registerCard("custom-desktop-card", CustomDesktopCard, {
+      id: "desktop",
       name: "Custom Desktop Card",
-      description: "Toont CPU, RAM, Temp en Opslag (Gebruikt / Totaal) in een minimalistische stijl.",
+      description: "Shows CPU, RAM, temperature and storage (used / total) in a minimalist style.",
       editor: {
         schema: [
           { name: "name", required: true, selector: { text: {} } },
@@ -162,21 +165,7 @@
           { name: "storage_used", selector: { entity: { domain: "sensor" } } },
           { name: "storage_free", selector: { entity: { domain: "sensor" } } },
           { name: "css_url", selector: { text: {} } }
-        ],
-        labels: {
-          name: "Naam",
-          device_tracker: "Device tracker (status Online/Offline)",
-          cpu: "CPU-gebruik",
-          memory: "RAM-gebruik",
-          temperature: "Temperatuur",
-          storage_used: "Opslag gebruikt",
-          storage_free: "Opslag vrij",
-          css_url: "Pad naar stylesheet (optioneel)"
-        },
-        helpers: {
-          device_tracker: "De status home geeft Online, not_home geeft Offline.",
-          css_url: "Alleen nodig als custom-cards-shared.css niet naast de scripts staat."
-        }
+        ]
       },
       stubConfig: { name: "Desktop" }
     });
@@ -190,7 +179,7 @@
 
     setTimeout(() => {
       if (!customElements.get("custom-cards-shared")) {
-        console.error("custom-desktop-card: custom-cards-shared.js is niet geladen. Voeg dat bestand toe als resource.");
+        console.error("custom-desktop-card: custom-cards-shared.js is not loaded. Add that file as a resource.");
       }
     }, 5000);
   }
