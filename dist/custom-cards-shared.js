@@ -25,12 +25,10 @@
   // Voorkomt problemen als dit bestand dubbel wordt geladen
   if (customElements.get("custom-cards-shared")) return;
 
-  // De stylesheet en de vertalingen staan naast dit bestand. Wordt het script als
-  // module geladen, dan is de locatie onbekend en geldt /local/. De stylesheet is per
-  // kaart te overschrijven met css_url in de kaartconfiguratie.
-  const BASE_URL = document.currentScript?.src
-    ? new URL(".", document.currentScript.src).href
-    : "/local/";
+  // Bepaal de locatie van deze ES-module zelf. Dit blijft werken wanneer
+  // Home Assistant het bestand via een import in ha-custom-cards.js laadt.
+  // De stylesheet is per kaart te overschrijven met css_url in de kaartconfiguratie.
+  const BASE_URL = new URL(".", import.meta.url).href;
 
   const CSS_URL = new URL("custom-cards-shared.css", new URL(BASE_URL, location.href)).href;
   const TRANSLATIONS_URL = new URL("custom-cards-translations/", new URL(BASE_URL, location.href)).href;
