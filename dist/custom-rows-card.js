@@ -11,7 +11,7 @@
     ];
 
     // Twee kolommen zodra beide minstens MIN_COLUMN_WIDTH breed kunnen zijn
-    const MIN_COLUMN_WIDTH = 260; // px
+    const MIN_COLUMN_WIDTH = 180; // px
     const COLUMN_GAP = 24; // px
 
     class CustomRowsCard extends CardBase {
