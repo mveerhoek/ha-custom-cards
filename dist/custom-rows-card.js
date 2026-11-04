@@ -3,12 +3,16 @@
   const start = () => {
     const { CardBase, registerCard } = window.CustomCardsShared;
 
-    // Optionele waarden achter de naam, in de volgorde waarin ze getoond worden
+    // Optionele waarden op de tweede regel, in de volgorde waarin ze getoond worden
     const VALUES = [
       { key: "temperature", decimals: 1, unit: "°C" },
       { key: "humidity", decimals: 0, unit: "%" },
       { key: "power", decimals: 0, unit: "W" }
     ];
+
+    // Twee kolommen zodra beide minstens MIN_COLUMN_WIDTH breed kunnen zijn
+    const MIN_COLUMN_WIDTH = 260; // px
+    const COLUMN_GAP = 24; // px
 
     class CustomRowsCard extends CardBase {
       setConfig(config) {
@@ -42,26 +46,28 @@
         this._build();
       }
 
+      connectedCallback() {
+        if (this._observer && this._grid) this._observer.observe(this._grid);
+      }
+
+      disconnectedCallback() {
+        this._observer?.disconnect();
+      }
+
       _build() {
         if (!this._ensureShadow()) return;
+
+        this._observer?.disconnect();
 
         const card = document.createElement("ha-card");
 
         const grid = document.createElement("div");
         grid.className = "entries";
-
-        // Alleen kolommen voor waarden die minstens één entry gebruikt. Alle regels delen
-        // dezelfde kolommen, dus de waarden staan onder elkaar uitgelijnd.
-        const activeValues = VALUES.filter((def) =>
-          this._config.entries.some((entry) => entry[def.key])
-        );
-
-        grid.style.gridTemplateColumns =
-          ["auto", "minmax(0, max-content)", ...activeValues.map(() => "auto")].join(" ");
+        grid.style.columnGap = `${COLUMN_GAP}px`;
 
         this._rows = this._config.entries.map((entry) => {
-          const row = document.createElement("div");
-          row.className = "entry";
+          const el = document.createElement("div");
+          el.className = "entry";
 
           // Icoon (grijs); met schakelaar ook een cirkel die klikbaar is
           const iconWrap = document.createElement("div");
@@ -80,33 +86,91 @@
             this._onActivate(iconWrap, () => this._toggle(entry.switch));
           }
 
+          const info = document.createElement("div");
+          info.className = "entry-info";
+
           // Naam (bold); bij een schakelaar opent een klik het more-info dialoog
           const name = document.createElement("div");
           name.className = "entry-name";
           name.textContent = entry.name;
           this._makeClickable(name, entry.switch);
 
-          row.append(iconWrap, name);
+          info.append(name);
 
-          // Waarden: altijd een cel per actieve kolom, ook als deze entry de waarde niet heeft
-          const values = activeValues.map((def) => {
-            const el = document.createElement("div");
-            el.className = "entry-value col-end";
-            this._makeClickable(el, entry[def.key]);
-            row.append(el);
+          // Tweede regel: alleen de geconfigureerde waarden, gescheiden door een punt
+          const values = [];
+          const defs = VALUES.filter((def) => entry[def.key]);
 
-            return { el, ...def };
-          });
+          if (defs.length) {
+            const summary = document.createElement("div");
+            summary.className = "entry-summary";
 
-          grid.append(row);
+            const row = document.createElement("div");
+            row.className = "summary-row";
 
-          return { entry, iconWrap, values };
+            defs.forEach((def, index) => {
+              if (index > 0) {
+                const separator = document.createElement("span");
+                separator.textContent = "·";
+                row.append(separator);
+              }
+
+              const valueEl = document.createElement("span");
+              this._makeClickable(valueEl, entry[def.key]);
+              row.append(valueEl);
+              values.push({ el: valueEl, ...def });
+            });
+
+            summary.append(row);
+            info.append(summary);
+          }
+
+          el.append(iconWrap, info);
+
+          return { el, entry, iconWrap, values };
         });
 
         card.append(grid);
+        this._grid = grid;
 
         this._setContent(card);
+
+        // Aantal kolommen volgt de breedte van de kaart
+        this._columns = null;
+        this._applyLayout(1);
+
+        this._observer = new ResizeObserver((records) => {
+          const width = records[0].contentRect.width;
+          const columns = width >= 2 * MIN_COLUMN_WIDTH + COLUMN_GAP ? 2 : 1;
+
+          if (columns !== this._columns) this._applyLayout(columns);
+        });
+        this._observer.observe(grid);
+
         this._update();
+      }
+
+      // Plaatst de regels in het raster, met een scheidingslijn na iedere volle rij
+      _applyLayout(columns) {
+        this._columns = columns;
+        this._grid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+
+        const children = [];
+
+        this._rows.forEach((row, index) => {
+          children.push(row.el);
+
+          const endOfRow = (index + 1) % columns === 0;
+          const isLast = index === this._rows.length - 1;
+
+          if (endOfRow && !isLast) {
+            const divider = document.createElement("div");
+            divider.className = "divider";
+            children.push(divider);
+          }
+        });
+
+        this._grid.replaceChildren(...children);
       }
 
       _toggle(entityId) {
@@ -151,13 +215,13 @@
           }
 
           values.forEach(({ el, key, decimals, unit }) => {
-            el.textContent = entry[key] ? this._formatValue(entry[key], decimals, unit) : "";
+            el.textContent = this._formatValue(entry[key], decimals, unit);
           });
         });
       }
 
       getCardSize() {
-        return this._config?.entries?.length || 1;
+        return Math.max(1, Math.ceil((this._config?.entries?.length || 1) * 0.8));
       }
     }
 
