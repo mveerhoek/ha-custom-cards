@@ -606,10 +606,11 @@ ha-card {
 }
 
 /* Regels onder elkaar; de kaart zet het aantal kolommen (1 of 2) en de kolomafstand.
-   De scheidingslijn tussen twee rijen is een .divider over de volle breedte. */
+   De scheidingslijn tussen twee rijen is een .divider over de volle breedte.
+   Een uitgeklapte regel wordt hoger zonder dat de buurregel meebeweegt. */
 .entries {
   display: grid;
-  align-items: center;
+  align-items: start;
 }
 
 .entries .divider {
@@ -618,11 +619,47 @@ ha-card {
 }
 
 .entry {
+  min-width: 0;
+}
+
+/* Kop van een regel: icoon | naam + waarden | pijltje (alleen met extra elementen) */
+.entry-head {
   display: flex;
   align-items: center;
   gap: var(--cc-header-gap);
-  min-width: 0;
   min-height: 34px;
+}
+
+.entry-head.expandable {
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  /* ruimer hovervlak, de inhoud blijft op zijn plek */
+  padding: 0 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
+}
+
+.entry-head.expandable:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .entry-head.expandable:hover {
+    background: var(--secondary-background-color);
+  }
+}
+
+.entry-chevron {
+  --mdc-icon-size: 20px;
+  color: var(--secondary-text-color);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.entry.open .entry-chevron {
+  transform: rotate(180deg);
 }
 
 .entry-info {
@@ -642,10 +679,17 @@ ha-card {
 }
 
 /* Tweede regel: temperatuur, luchtvochtigheid en vermogen (rij-opmaak: .summary-row) */
-.entry-summary {
+.entry-summary,
+.extra-status {
   color: var(--secondary-text-color);
   font-size: 12px;
   line-height: 16px;
+}
+
+.extra-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Icoon: grijs; bij een schakelaar met een lichtgrijze cirkel erachter */
@@ -697,4 +741,95 @@ ha-card {
     color: var(--cc-switch-color);
     background: color-mix(in srgb, var(--cc-switch-color) 32%, transparent);
   }
+}
+
+/* ----- Extra elementen (uitgeklapt) ----- */
+
+.entry-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.extra-view {
+  display: flex;
+  align-items: center;
+  gap: var(--cc-header-gap);
+  min-height: 34px;
+}
+
+.extra-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extra-labels {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Ronde icoonknop (lichtgrijze cirkel, bij hover een accenttint) */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font: inherit;
+  --mdc-icon-size: 20px;
+  color: var(--secondary-text-color);
+  background: var(--secondary-background-color);
+  background: color-mix(in srgb, var(--secondary-text-color) 14%, transparent);
+  transition: background 0.15s, color 0.15s;
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .icon-btn:not(:disabled):hover {
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 20%, transparent);
+  }
+}
+
+.volume-slider {
+  flex: 1;
+  min-width: 0;
+  margin: 0 4px;
+  accent-color: var(--primary-color);
+}
+
+/* Temperatuur aanpassen: - | waarde | + */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.stepper-value {
+  min-width: 58px;
+  text-align: center;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
