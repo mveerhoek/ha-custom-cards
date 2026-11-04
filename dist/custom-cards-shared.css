@@ -600,23 +600,52 @@ ha-card {
 
 :host(custom-rows-card) {
   --cc-card-padding: 8px;
+  --cc-header-gap: 10px;
+  --cc-row-gap: 2px;          /* ruimte tussen een regel en de scheidingslijn */
   --cc-switch-color: #ff9800; /* kleur van een actieve schakelaar/lamp */
 }
 
-/* De kaart zet de kolommen zelf: icoon | naam | [temperatuur] | [luchtvochtigheid] | [vermogen].
-   Elke regel (.entry) is display: contents, zodat alle regels dezelfde kolommen delen
-   en de waarden dus onder elkaar uitgelijnd staan. */
+/* Regels onder elkaar; de kaart zet het aantal kolommen (1 of 2) en de kolomafstand.
+   De scheidingslijn tussen twee rijen is een .divider over de volle breedte. */
 .entries {
   display: grid;
-  justify-content: start;
   align-items: center;
-  column-gap: 12px;
-  row-gap: 4px;
-  max-width: 100%;
+}
+
+.entries .divider {
+  grid-column: 1 / -1;
+  margin: var(--cc-row-gap) 0;
 }
 
 .entry {
-  display: contents;
+  display: flex;
+  align-items: center;
+  gap: var(--cc-header-gap);
+  min-width: 0;
+  min-height: 34px;
+}
+
+.entry-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.entry-name {
+  width: fit-content;
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Tweede regel: temperatuur, luchtvochtigheid en vermogen (rij-opmaak: .summary-row) */
+.entry-summary {
+  color: var(--secondary-text-color);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 /* Icoon: grijs; bij een schakelaar met een lichtgrijze cirkel erachter */
@@ -624,11 +653,12 @@ ha-card {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   box-sizing: border-box;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  --mdc-icon-size: 22px;
+  --mdc-icon-size: 20px;
   color: var(--secondary-text-color);
   transition: background 0.15s, color 0.15s;
 }
@@ -667,22 +697,4 @@ ha-card {
     color: var(--cc-switch-color);
     background: color-mix(in srgb, var(--cc-switch-color) 32%, transparent);
   }
-}
-
-.entry-name {
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 20px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.entry-value {
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 20px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
