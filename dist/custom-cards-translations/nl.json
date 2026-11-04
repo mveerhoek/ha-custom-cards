@@ -85,4 +85,7 @@
   "editor.docker.projects": "Projecten (YAML-lijst)",
   "editor.docker.projects.help": "Per project: name en containers. Overige containers komen in Other.",
   "editor.docker.example": "projects:\n  - name: Media\n    containers:\n      - plex\n      - sonarr\n  - name: Tools\n    containers:\n      - ghost"
+  "editor.rows.entries": "Regels",
+  "editor.rows.entries.help": "Lijst met regels: naam, icoon en optioneel schakelaar, temperatuur, luchtvochtigheid, vermogen",
+  "editor.rows.css_url": "Pad naar stylesheet"
 }
