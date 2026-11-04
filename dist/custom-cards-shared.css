@@ -607,7 +607,7 @@ ha-card {
 
 /* Regels onder elkaar; de kaart zet het aantal kolommen (1 of 2) en de kolomafstand.
    De scheidingslijn tussen twee rijen is een .divider over de volle breedte.
-   Een uitgeklapte regel wordt hoger zonder dat de buurregel meebeweegt. */
+   Een uitgeklapte regel beslaat een hele rij (de kaart zet grid-column op de regel). */
 .entries {
   display: grid;
   align-items: start;
@@ -771,6 +771,13 @@ ha-card {
 .extra-labels {
   flex: 1;
   min-width: 0;
+}
+
+/* Rij met een lange-druk-actie: geen tekstselectie of oproepmenu bij vasthouden */
+.long-press {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 /* Ronde icoonknop (lichtgrijze cirkel, bij hover een accenttint) */

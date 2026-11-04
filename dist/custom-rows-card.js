@@ -150,9 +150,6 @@
           name.className = "entry-name";
           name.textContent = entry.name;
 
-          // Zonder extra elementen opent een klik op de naam het more-info dialoog van de schakelaar
-          if (!entry.extras.length) this._makeClickable(name, entry.switch);
-
           info.append(name);
 
           // Tweede regel: alleen de geconfigureerde waarden, gescheiden door een punt
@@ -239,23 +236,39 @@
         this._update();
       }
 
-      // Plaatst de regels in het raster, met een scheidingslijn na iedere volle rij
+      // Plaatst de regels in het raster, met een scheidingslijn na iedere volle rij.
+      // Een uitgeklapte regel krijgt een eigen rij over de volle breedte.
       _applyLayout(columns) {
         this._columns = columns;
         this._grid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
 
         const children = [];
+        const lastIndex = this._rows.length - 1;
+        let column = 0; // aantal gevulde kolommen in de huidige rij
+
+        const addDivider = () => {
+          const divider = document.createElement("div");
+          divider.className = "divider";
+          children.push(divider);
+        };
 
         this._rows.forEach((row, index) => {
+          const open = !!row.extrasEl && this._expanded.has(index);
+
+          // Een uitgeklapte regel begint op een nieuwe rij
+          if (open && column !== 0) {
+            addDivider();
+            column = 0;
+          }
+
+          row.el.style.gridColumn = open ? "1 / -1" : "";
           children.push(row.el);
 
-          const endOfRow = (index + 1) % columns === 0;
-          const isLast = index === this._rows.length - 1;
+          column = open ? columns : column + 1;
 
-          if (endOfRow && !isLast) {
-            const divider = document.createElement("div");
-            divider.className = "divider";
-            children.push(divider);
+          if (column >= columns) {
+            column = 0;
+            if (index !== lastIndex) addDivider();
           }
         });
 
@@ -271,6 +284,12 @@
         else this._expanded.delete(index);
 
         this._applyOpen(this._rows[index], open);
+
+        // De regels worden opnieuw geplaatst; het element met focus houdt die focus
+        const focused = this.shadowRoot.activeElement;
+
+        this._applyLayout(this._columns);
+        focused?.focus?.();
       }
 
       _applyOpen(row, open) {
@@ -315,6 +334,44 @@
         } catch (err) {
           return value.toFixed(1);
         }
+      }
+
+      // Lang indrukken (standaard een halve seconde). Knoppen en de slider in het element
+      // doen niet mee; bij bewegen (scrollen) of loslaten vooraf wordt het afgebroken.
+      _onLongPress(element, handler, { delay = 500 } = {}) {
+        let timer = null;
+        let startX = 0;
+        let startY = 0;
+
+        const cancel = () => {
+          clearTimeout(timer);
+          timer = null;
+        };
+
+        element.addEventListener("pointerdown", (event) => {
+          if (event.button !== 0 || event.target.closest("button, input")) return;
+
+          cancel();
+          startX = event.clientX;
+          startY = event.clientY;
+
+          timer = setTimeout(() => {
+            timer = null;
+            navigator.vibrate?.(30);
+            handler();
+          }, delay);
+        });
+
+        element.addEventListener("pointermove", (event) => {
+          if (timer && Math.hypot(event.clientX - startX, event.clientY - startY) > 10) cancel();
+        });
+
+        ["pointerup", "pointercancel", "pointerleave"].forEach((type) =>
+          element.addEventListener(type, cancel)
+        );
+
+        // Voorkomt het contextmenu dat een lange druk op touchscreens kan openen
+        element.addEventListener("contextmenu", (event) => event.preventDefault());
       }
 
       // Ronde icoonknop; geeft het element en een functie om het icoon te wisselen
@@ -482,6 +539,19 @@
 
         stepper.append(minus.el, value, plus.el);
         el.append(info.el, labels, stepper);
+
+        // Lang indrukken op de rij: uit -> aan, anders -> uit
+        el.classList.add("long-press");
+
+        this._onLongPress(el, () => {
+          const state = this._getState(extra.entity);
+
+          if (!isAvailable(state)) return;
+
+          this._callService("climate", state.state === "off" ? "turn_on" : "turn_off", {
+            entity_id: extra.entity
+          });
+        });
 
         // Snel achter elkaar klikken: de gekozen waarde wordt direct getoond en na een
         // korte pauze in één keer doorgegeven aan Home Assistant.
