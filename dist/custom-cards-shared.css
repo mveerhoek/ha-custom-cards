@@ -284,6 +284,17 @@ ha-card {
   color: var(--error-color, #db4437);
 }
 
+/* Omkaderd vak: een project (docker-combined-card) of een uitgeklapt element
+   onder een regel (custom-rows-card) */
+.project,
+.extra {
+  border: 1px solid var(--outline-color, var(--divider-color));
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--secondary-background-color);
+  background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
+}
+
 /* Ronde icoonknop aan het eind van een rij (herstarten, aan/uit) */
 .restart-btn,
 .container-toggle {
@@ -520,14 +531,6 @@ ha-card {
   gap: 8px;
 }
 
-.project {
-  border: 1px solid var(--outline-color, var(--divider-color));
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: var(--secondary-background-color);
-  background: color-mix(in srgb, var(--primary-text-color) 4%, transparent);
-}
-
 .project-header {
   display: block;
   padding: 4px 6px;
@@ -599,9 +602,9 @@ ha-card {
 /* ---------- custom-rows-card ---------- */
 
 :host(custom-rows-card) {
-  --cc-card-padding: 8px;
+  --cc-entry-gap: 8px;        /* afstand van een icoon tot de kaartrand en tot de scheidingslijn */
+  --cc-card-padding: var(--cc-entry-gap);
   --cc-header-gap: 10px;
-  --cc-row-gap: 2px;          /* ruimte tussen een regel en de scheidingslijn */
   --cc-switch-color: #ff9800; /* kleur van een actieve schakelaar/lamp */
 }
 
@@ -615,7 +618,7 @@ ha-card {
 
 .entries .divider {
   grid-column: 1 / -1;
-  margin: var(--cc-row-gap) 0;
+  margin: var(--cc-entry-gap) 0;
 }
 
 .entry {
@@ -627,7 +630,7 @@ ha-card {
   display: flex;
   align-items: center;
   gap: var(--cc-header-gap);
-  min-height: 34px;
+  min-height: 32px; /* gelijk aan het icoon, zodat de afstanden kloppen */
 }
 
 .entry-head.expandable {
@@ -683,7 +686,7 @@ ha-card {
 .extra-status {
   color: var(--secondary-text-color);
   font-size: 12px;
-  line-height: 16px;
+  line-height: 14px; /* naam (18px) + deze regel = 32px, de hoogte van het icoon */
 }
 
 .extra-status {
@@ -748,15 +751,16 @@ ha-card {
 .entry-extras {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 4px;
+  gap: var(--cc-entry-gap);
+  margin-top: var(--cc-entry-gap);
 }
 
+/* Ieder uitgeklapt element staat in een eigen vak (.extra, zie sectie 2) */
 .extra-view {
   display: flex;
   align-items: center;
   gap: var(--cc-header-gap);
-  min-height: 34px;
+  min-height: 32px;
 }
 
 .extra-label {
