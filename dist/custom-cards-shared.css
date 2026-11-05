@@ -708,6 +708,7 @@ ha-card {
 
 /* Icoon: grijs; bij een schakelaar met een lichtgrijze cirkel erachter */
 .entry-icon {
+  position: relative; /* voor de badges */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -719,6 +720,45 @@ ha-card {
   --mdc-icon-size: 20px;
   color: var(--secondary-text-color);
   transition: background 0.15s, color 0.15s;
+}
+
+/* Badges: klein statusicoon in een hoek van het hoofdicoon. Eerste badge rechtsboven,
+   tweede rechtsonder. Niet klikbaar: een klik valt door naar het icoon (schakelaar). */
+.entry-badge {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  --mdc-icon-size: 12px;
+  background: var(--ha-card-background, var(--card-background-color, #fff));
+  box-shadow: 0 0 0 1px var(--divider-color, rgba(127, 127, 127, 0.3));
+  pointer-events: none;
+}
+
+.entry-badge[hidden] {
+  display: none;
+}
+
+.entry-badge.top-right {
+  top: -4px;
+  right: -4px;
+}
+
+.entry-badge.bottom-right {
+  bottom: -4px;
+  right: -4px;
+}
+
+.entry-badge[data-tone="heat"] {
+  color: var(--cc-heat-color);
+}
+
+.entry-badge[data-tone="cool"] {
+  color: var(--cc-cool-color);
 }
 
 .entry-icon.switchable {
