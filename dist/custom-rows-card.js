@@ -53,12 +53,13 @@
       return null;
     };
 
-    // Badges: klein statusicoon in een hoek van het hoofdicoon. De volgorde is vast:
-    // de eerste badge staat rechtsboven, de tweede rechtsonder.
+    // Badges: klein statusicoon in een hoek van het hoofdicoon. Van de getoonde badges staat
+    // de eerste rechtsboven en de tweede rechtsonder (volgorde van de lijst hieronder).
     // resolve geeft { icon, tone } als de badge getoond moet worden, anders null.
+    const BADGE_SLOTS = ["top-right", "bottom-right"];
+
     const BADGES = [
       {
-        slot: "top-right",
         applies: (entry) => entry.extras.some((extra) => extra.type === "climate"),
         resolve: (card, entry) => {
           for (const extra of entry.extras) {
@@ -72,8 +73,20 @@
 
           return null;
         }
+      },
+      {
+        // Deur: binary_sensor, aan = open, uit = dicht; onbekend of niet beschikbaar = geen badge
+        applies: (entry) => !!entry.door,
+        resolve: (card, entry) => {
+          const state = card._getState(entry.door);
+
+          if (!isAvailable(state)) return null;
+
+          return state.state === "on"
+            ? { icon: "mdi:door-open", tone: "door-open" }
+            : { icon: "mdi:door", tone: "door-closed" };
+        }
       }
-      // Tweede badge (rechtsonder): nog niet in gebruik
     ];
 
     const toNumber = (value) =>
@@ -129,6 +142,7 @@
             illuminance: entry.illuminance,
             pressure: entry.pressure,
             power: entry.power,
+            door: entry.door, // optioneel: binary_sensor van een deur (alleen als badge)
             extras
           };
         });
@@ -180,7 +194,7 @@
           // Badges in de hoeken van het icoon (alleen als die voor deze regel van toepassing zijn)
           const badges = BADGES.filter((def) => def.applies(entry)).map((def) => {
             const badge = document.createElement("span");
-            badge.className = `entry-badge ${def.slot}`;
+            badge.className = "entry-badge";
             badge.hidden = true;
             badge.setAttribute("aria-hidden", "true");
 
@@ -999,14 +1013,19 @@
             iconWrap.setAttribute("aria-checked", String(isOn));
           }
 
+          // Getoonde badges krijgen op volgorde een hoek: eerst rechtsboven, dan rechtsonder
+          let shown = 0;
+
           badges.forEach(({ def, el, icon }) => {
-            const result = def.resolve(this, entry);
+            const result = shown < BADGE_SLOTS.length ? def.resolve(this, entry) : null;
 
             el.hidden = !result;
             if (!result) return;
 
             if (icon.icon !== result.icon) icon.icon = result.icon;
             el.dataset.tone = result.tone;
+            el.dataset.slot = BADGE_SLOTS[shown];
+            shown++;
           });
 
           values.forEach(({ el, key, decimals, unit }) => {

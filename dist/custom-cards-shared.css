@@ -608,6 +608,8 @@ ha-card {
   --cc-switch-color: #ff9800; /* kleur van een actieve schakelaar/lamp */
   --cc-heat-color: #f44336;   /* climate-icoon tijdens verwarmen */
   --cc-cool-color: #2196f3;   /* climate-icoon tijdens koelen */
+  --cc-door-open-color: #ff9800;                      /* deurbadge: deur open (oranje) */
+  --cc-door-closed-color: var(--success-color, #4caf50); /* deurbadge: deur dicht (groen) */
   --cc-power-on-color: var(--success-color, #4caf50); /* stroomschakelaar: aan */
   --cc-power-status-color: #8bc34a;                    /* stroomschakelaar: binary sensor aan (light green) */
 }
@@ -743,12 +745,12 @@ ha-card {
   display: none;
 }
 
-.entry-badge.top-right {
+.entry-badge[data-slot="top-right"] {
   top: -4px;
   right: -4px;
 }
 
-.entry-badge.bottom-right {
+.entry-badge[data-slot="bottom-right"] {
   bottom: -4px;
   right: -4px;
 }
@@ -759,6 +761,14 @@ ha-card {
 
 .entry-badge[data-tone="cool"] {
   color: var(--cc-cool-color);
+}
+
+.entry-badge[data-tone="door-open"] {
+  color: var(--cc-door-open-color);
+}
+
+.entry-badge[data-tone="door-closed"] {
+  color: var(--cc-door-closed-color);
 }
 
 .entry-icon.switchable {
