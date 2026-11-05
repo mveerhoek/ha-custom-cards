@@ -736,8 +736,7 @@ ha-card {
   height: 16px;
   border-radius: 50%;
   --mdc-icon-size: 12px;
-  background: var(--ha-card-background, var(--card-background-color, #fff));
-  box-shadow: 0 0 0 1px var(--divider-color, rgba(127, 127, 127, 0.3));
+  color: #fff; /* wit icoon; de kleur van de badge zit in de achtergrondcirkel (data-tone) */
   pointer-events: none;
 }
 
@@ -756,19 +755,19 @@ ha-card {
 }
 
 .entry-badge[data-tone="heat"] {
-  color: var(--cc-heat-color);
+  background: var(--cc-heat-color);
 }
 
 .entry-badge[data-tone="cool"] {
-  color: var(--cc-cool-color);
+  background: var(--cc-cool-color);
 }
 
 .entry-badge[data-tone="door-open"] {
-  color: var(--cc-door-open-color);
+  background: var(--cc-door-open-color);
 }
 
 .entry-badge[data-tone="door-closed"] {
-  color: var(--cc-door-closed-color);
+  background: var(--cc-door-closed-color);
 }
 
 .entry-icon.switchable {
