@@ -509,7 +509,10 @@
 
       _buildClimate(extra) {
         const el = document.createElement("div");
-        el.className = "extra extra-view";
+        el.className = "extra";
+
+        const view = document.createElement("div");
+        view.className = "extra-view";
 
         // Icoon (more-info) | naam boven status | - temperatuur +
         const info = this._iconButton(() => this._openMoreInfo(extra.entity));
@@ -538,7 +541,8 @@
         plus.setIcon("mdi:plus");
 
         stepper.append(minus.el, value, plus.el);
-        el.append(info.el, labels, stepper);
+        view.append(info.el, labels, stepper);
+        el.append(view);
 
         // Lang indrukken op de rij: uit -> aan, anders -> uit
         el.classList.add("long-press");
