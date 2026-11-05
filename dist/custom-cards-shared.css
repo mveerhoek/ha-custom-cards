@@ -284,10 +284,10 @@ ha-card {
   color: var(--error-color, #db4437);
 }
 
-/* Omkaderd vak: een project (docker-combined-card) of een uitgeklapt element
-   onder een regel (custom-rows-card) */
+/* Omkaderd vak: een project (docker-combined-card) of de uitgeklapte elementen
+   van een regel (custom-rows-card) */
 .project,
-.extra {
+.entry-extras {
   border: 1px solid var(--outline-color, var(--divider-color));
   border-radius: 10px;
   padding: 8px 10px;
@@ -606,6 +606,8 @@ ha-card {
   --cc-card-padding: var(--cc-entry-gap);
   --cc-header-gap: 10px;
   --cc-switch-color: #ff9800; /* kleur van een actieve schakelaar/lamp */
+  --cc-heat-color: #f44336;   /* climate-icoon tijdens verwarmen */
+  --cc-cool-color: #2196f3;   /* climate-icoon tijdens koelen */
 }
 
 /* Regels onder elkaar; de kaart zet het aantal kolommen (1 of 2) en de kolomafstand.
@@ -748,6 +750,7 @@ ha-card {
 
 /* ----- Extra elementen (uitgeklapt) ----- */
 
+/* Alle extra elementen van een regel staan samen in één vak (opmaak: sectie 2) */
 .entry-extras {
   display: flex;
   flex-direction: column;
@@ -755,21 +758,11 @@ ha-card {
   margin-top: var(--cc-entry-gap);
 }
 
-/* Ieder uitgeklapt element staat in een eigen vak (.extra, zie sectie 2) */
 .extra-view {
   display: flex;
   align-items: center;
   gap: var(--cc-header-gap);
   min-height: 32px;
-}
-
-.extra-label {
-  flex: 1;
-  min-width: 0;
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .extra-labels {
@@ -819,6 +812,29 @@ ha-card {
   .icon-btn:not(:disabled):hover {
     color: var(--primary-color);
     background: color-mix(in srgb, var(--primary-color) 20%, transparent);
+  }
+}
+
+/* Climate-icoon: rood tijdens verwarmen, blauw tijdens koelen */
+.icon-btn.heating {
+  color: var(--cc-heat-color);
+  background: color-mix(in srgb, var(--cc-heat-color) 20%, transparent);
+}
+
+.icon-btn.cooling {
+  color: var(--cc-cool-color);
+  background: color-mix(in srgb, var(--cc-cool-color) 20%, transparent);
+}
+
+@media (hover: hover) {
+  .icon-btn.heating:not(:disabled):hover {
+    color: var(--cc-heat-color);
+    background: color-mix(in srgb, var(--cc-heat-color) 32%, transparent);
+  }
+
+  .icon-btn.cooling:not(:disabled):hover {
+    color: var(--cc-cool-color);
+    background: color-mix(in srgb, var(--cc-cool-color) 32%, transparent);
   }
 }
 
