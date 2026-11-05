@@ -765,13 +765,63 @@
           toggle.setAttribute("role", "switch");
           toggle.setAttribute("tabindex", "0");
 
-          this._onActivate(toggle, () => this._toggle(extra.entity), { stopPropagation: true });
+          this._onActivate(toggle, () => requestToggle(), { stopPropagation: true });
         }
 
         right.append(toggle);
 
         view.append(iconWrap, labels, right);
-        el.append(view);
+
+        // Bevestiging: vervangt de rij tijdelijk door "<naam> uitschakelen?" met een vink en een kruis
+        const confirmView = document.createElement("div");
+        confirmView.className = "extra-view";
+        confirmView.hidden = true;
+
+        const confirmLabels = document.createElement("div");
+        confirmLabels.className = "extra-labels";
+
+        const confirmText = document.createElement("div");
+        confirmText.className = "entry-name";
+        confirmLabels.append(confirmText);
+
+        const confirmNo = this._iconButton(() => showConfirm(false));
+        confirmNo.setIcon("mdi:close");
+
+        const confirmYes = this._iconButton(() => {
+          showConfirm(false);
+          this._toggle(extra.entity);
+        });
+        confirmYes.setIcon("mdi:check");
+
+        confirmView.append(confirmLabels, confirmNo.el, confirmYes.el);
+        el.append(view, confirmView);
+
+        let confirmTimer = null;
+
+        const showConfirm = (show) => {
+          clearTimeout(confirmTimer);
+          confirmTimer = null;
+
+          view.hidden = show;
+          confirmView.hidden = !show;
+
+          // Zonder reactie keert de rij na een paar seconden vanzelf terug
+          if (show) confirmTimer = setTimeout(() => showConfirm(false), 5000);
+        };
+
+        // Uitschakelen vraagt om bevestiging zolang de binary sensor aan staat;
+        // aanzetten, of uitzetten terwijl de binary sensor uit staat, gaat direct.
+        const requestToggle = () => {
+          const state = this._getState(extra.entity);
+
+          if (!this._hass || !state || state.state === "unavailable") return;
+
+          if (state.state === "on" && extra.status && this._getState(extra.status)?.state === "on") {
+            showConfirm(true);
+          } else {
+            this._toggle(extra.entity);
+          }
+        };
 
         const update = () => {
           const state = this._getState(extra.entity);
@@ -780,6 +830,17 @@
 
           name.textContent = text;
           name.title = text;
+
+          const nl = String(this._language || "").toLowerCase().startsWith("nl");
+          const question = nl ? `${text} uitschakelen?` : `Turn off ${text}?`;
+
+          confirmText.textContent = question;
+          confirmText.title = question;
+
+          // Is de schakelaar al uit of de binary sensor inmiddels uit, dan vervalt de vraag
+          if (!confirmView.hidden && (!isOn || !extra.status || this._getState(extra.status)?.state !== "on")) {
+            showConfirm(false);
+          }
 
           if (power) power.textContent = this._formatValue(extra.power, 0, "W");
 
