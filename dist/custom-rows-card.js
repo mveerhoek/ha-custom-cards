@@ -15,7 +15,7 @@
     const COLUMN_GAP = 20; // px
 
     // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate"];
+    const EXTRA_TYPES = ["media_player", "climate", "power_switch"];
     const DEFAULT_STEP = 0.5; // °C per klik bij een climate
 
     const MEDIA_ICONS = {
@@ -74,7 +74,10 @@
               entity: extra.entity,
               name: extra.name, // optioneel: overschrijft de naam van de entiteit
               icon: extra.icon, // optioneel: overschrijft het icoon van de knop
-              step: Number(extra.step) > 0 ? Number(extra.step) : DEFAULT_STEP // alleen climate
+              step: Number(extra.step) > 0 ? Number(extra.step) : DEFAULT_STEP, // alleen climate
+              power: extra.power, // alleen power_switch: vermogenssensor (optioneel)
+              status: extra.status, // alleen power_switch: binary_sensor (optioneel)
+              switchable: extra.switchable === true // alleen power_switch: schakelbaar vanuit de kaart
             };
           });
 
@@ -197,9 +200,11 @@
             extrasEl.className = "entry-extras";
             extrasEl.hidden = true;
 
-            extras = entry.extras.map((extra) =>
-              extra.type === "climate" ? this._buildClimate(extra) : this._buildMedia(extra)
-            );
+            extras = entry.extras.map((extra) => {
+              if (extra.type === "climate") return this._buildClimate(extra);
+              if (extra.type === "power_switch") return this._buildPowerSwitch(extra);
+              return this._buildMedia(extra);
+            });
             extrasEl.append(...extras.map((extra) => extra.el));
             el.append(extrasEl);
 
@@ -648,6 +653,111 @@
         return { el, update };
       }
 
+      // ----- Extra element: stroomschakelaar -----
+
+      // Eén rij: icoon | naam (dik) | vermogen + status van de binary sensor (rechts)
+      _buildPowerSwitch(extra) {
+        const el = document.createElement("div");
+        el.className = "extra";
+
+        const view = document.createElement("div");
+        view.className = "extra-view";
+
+        // De status van de schakelaar is altijd te zien: het icoon kleurt oranje als hij aan staat.
+        // Alleen met switchable: true komt er ook een klikbare cirkel omheen.
+        const iconWrap = document.createElement("div");
+        iconWrap.className = "entry-icon";
+
+        const icon = document.createElement("ha-icon");
+        icon.icon = extra.icon || "mdi:power-socket-eu";
+        iconWrap.append(icon);
+
+        if (extra.switchable) {
+          iconWrap.classList.add("switchable");
+          iconWrap.setAttribute("role", "switch");
+          iconWrap.setAttribute("tabindex", "0");
+
+          this._onActivate(iconWrap, () => this._toggle(extra.entity), { stopPropagation: true });
+        }
+
+        const labels = document.createElement("div");
+        labels.className = "extra-labels";
+
+        const name = document.createElement("div");
+        name.className = "entry-name";
+        labels.append(name);
+
+        const right = document.createElement("div");
+        right.className = "extra-right";
+
+        let power = null;
+
+        if (extra.power) {
+          power = document.createElement("span");
+          power.className = "extra-value";
+          this._makeClickable(power, extra.power);
+          right.append(power);
+        }
+
+        // Standaardicoon van de binary sensor (afhankelijk van device class en status)
+        let statusWrap = null;
+        let statusIcon = null;
+        const hasStateIcon = !!customElements.get("ha-state-icon");
+
+        if (extra.status) {
+          statusWrap = document.createElement("span");
+          statusWrap.className = "extra-state-icon";
+
+          statusIcon = document.createElement(hasStateIcon ? "ha-state-icon" : "ha-icon");
+          statusWrap.append(statusIcon);
+
+          this._makeClickable(statusWrap, extra.status);
+          right.append(statusWrap);
+        }
+
+        view.append(iconWrap, labels, right);
+        el.append(view);
+
+        const update = () => {
+          const state = this._getState(extra.entity);
+          const isOn = state?.state === "on";
+          const text = extra.name || state?.attributes?.friendly_name || extra.entity;
+
+          iconWrap.classList.toggle("on", isOn);
+          iconWrap.classList.toggle("unavailable", !state || state.state === "unavailable");
+          iconWrap.title = state ? this._stateText(state) : "—";
+
+          if (extra.switchable) {
+            iconWrap.setAttribute("aria-checked", String(isOn));
+            iconWrap.setAttribute("aria-label", text);
+          }
+
+          name.textContent = text;
+          name.title = text;
+
+          if (power) power.textContent = this._formatValue(extra.power, 0, "W");
+
+          if (statusWrap) {
+            const status = this._getState(extra.status);
+
+            if (hasStateIcon) {
+              statusIcon.hass = this._hass;
+              statusIcon.stateObj = status;
+            } else {
+              const fallback = status?.attributes?.icon ||
+                (status?.state === "on" ? "mdi:checkbox-marked-circle" : "mdi:radiobox-blank");
+
+              if (statusIcon.icon !== fallback) statusIcon.icon = fallback;
+            }
+
+            statusWrap.classList.toggle("unavailable", !status || status.state === "unavailable");
+            statusWrap.title = status ? this._stateText(status) : "—";
+          }
+        };
+
+        return { el, update };
+      }
+
       // ----- Bijwerken -----
 
       _formatValue(entityId, decimals, fallbackUnit) {
@@ -699,7 +809,7 @@
     registerCard("custom-rows-card", CustomRowsCard, {
       id: "rows",
       name: "Custom Rows Card",
-      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate controls.",
+      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / power switch elements.",
       editor: {
         schema: [
           { name: "entries", selector: { object: {} } },
