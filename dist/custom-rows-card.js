@@ -39,6 +39,43 @@
     const isAvailable = (state) =>
       !!state && state.state !== "unavailable" && state.state !== "unknown";
 
+    // Wat doet een climate nu? "heating", "cooling" of null (niet actief).
+    // Volgt hvac_action; heeft het toestel dat attribuut niet, dan geldt de ingestelde modus.
+    const climateAction = (state) => {
+      if (!isAvailable(state)) return null;
+
+      const action = state.attributes?.hvac_action ??
+        (state.state === "heat" ? "heating" : state.state === "cool" ? "cooling" : null);
+
+      if (action === "heating" || action === "preheating") return "heating";
+      if (action === "cooling") return "cooling";
+
+      return null;
+    };
+
+    // Badges: klein statusicoon in een hoek van het hoofdicoon. De volgorde is vast:
+    // de eerste badge staat rechtsboven, de tweede rechtsonder.
+    // resolve geeft { icon, tone } als de badge getoond moet worden, anders null.
+    const BADGES = [
+      {
+        slot: "top-right",
+        applies: (entry) => entry.extras.some((extra) => extra.type === "climate"),
+        resolve: (card, entry) => {
+          for (const extra of entry.extras) {
+            if (extra.type !== "climate") continue;
+
+            const action = climateAction(card._getState(extra.entity));
+
+            if (action === "heating") return { icon: "mdi:heat-wave", tone: "heat" };
+            if (action === "cooling") return { icon: "mdi:snowflake", tone: "cool" };
+          }
+
+          return null;
+        }
+      }
+      // Tweede badge (rechtsonder): nog niet in gebruik
+    ];
+
     const toNumber = (value) =>
       value === null || value === undefined || value === "" || !Number.isFinite(Number(value))
         ? null
@@ -140,6 +177,20 @@
           icon.icon = entry.icon;
           iconWrap.append(icon);
 
+          // Badges in de hoeken van het icoon (alleen als die voor deze regel van toepassing zijn)
+          const badges = BADGES.filter((def) => def.applies(entry)).map((def) => {
+            const badge = document.createElement("span");
+            badge.className = `entry-badge ${def.slot}`;
+            badge.hidden = true;
+            badge.setAttribute("aria-hidden", "true");
+
+            const badgeIcon = document.createElement("ha-icon");
+            badge.append(badgeIcon);
+            iconWrap.append(badge);
+
+            return { def, el: badge, icon: badgeIcon };
+          });
+
           if (entry.switch) {
             iconWrap.classList.add("switchable");
             iconWrap.setAttribute("role", "switch");
@@ -222,7 +273,7 @@
             this._onActivate(head, () => this._toggleExpanded(index));
           }
 
-          const row = { el, head, extrasEl, entry, iconWrap, values, extras, summaryRow: summaryRowEl };
+          const row = { el, head, extrasEl, entry, iconWrap, values, extras, badges, summaryRow: summaryRowEl };
 
           this._applyOpen(row, this._expanded.has(index));
 
@@ -712,11 +763,10 @@
 
           info.setIcon(extra.icon || CLIMATE_ICONS[state?.state] || "mdi:thermostat");
 
-          // Kleur volgens wat het toestel nu doet (hvac_action); heeft het toestel dat
-          // attribuut niet, dan geldt de ingestelde modus (heat / cool)
-          const action = attrs.hvac_action ?? (state?.state === "heat" ? "heating" : state?.state === "cool" ? "cooling" : null);
+          // Kleur volgens wat het toestel nu doet (hvac_action, anders de ingestelde modus)
+          const action = climateAction(state);
 
-          info.el.classList.toggle("heating", action === "heating" || action === "preheating");
+          info.el.classList.toggle("heating", action === "heating");
           info.el.classList.toggle("cooling", action === "cooling");
 
           const current = control.pending ?? toNumber(attrs.temperature);
@@ -939,7 +989,7 @@
       _update() {
         if (!this._hass || !this._rows) return;
 
-        this._rows.forEach(({ entry, iconWrap, values, extras }) => {
+        this._rows.forEach(({ entry, iconWrap, values, extras, badges }) => {
           if (entry.switch) {
             const state = this._getState(entry.switch);
             const isOn = state?.state === "on";
@@ -948,6 +998,16 @@
             iconWrap.classList.toggle("unavailable", !state || state.state === "unavailable");
             iconWrap.setAttribute("aria-checked", String(isOn));
           }
+
+          badges.forEach(({ def, el, icon }) => {
+            const result = def.resolve(this, entry);
+
+            el.hidden = !result;
+            if (!result) return;
+
+            if (icon.icon !== result.icon) icon.icon = result.icon;
+            el.dataset.tone = result.tone;
+          });
 
           values.forEach(({ el, key, decimals, unit }) => {
             el.textContent = this._formatValue(entry[key], decimals, unit);
