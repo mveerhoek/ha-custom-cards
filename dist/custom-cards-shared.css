@@ -685,7 +685,14 @@ ha-card {
   white-space: nowrap;
 }
 
-/* Tweede regel: temperatuur, luchtvochtigheid en vermogen (rij-opmaak: .summary-row) */
+/* Tweede regel: temperatuur, luchtvochtigheid, lichtintensiteit, luchtdruk en vermogen
+   (rij-opmaak: .summary-row). Eén regel: past niet alles, dan laat de kaart de laatste
+   waarden helemaal weg (zie _fitSummaries), zodat er niets afgeknipt wordt. */
+.entry-summary .summary-row {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
 .entry-summary,
 .extra-status {
   color: var(--secondary-text-color);
@@ -778,6 +785,13 @@ ha-card {
 }
 
 /* Opeenvolgende stroomschakelaars staan dichter op elkaar */
+/* Compacte knoppen (bevestiging) passen in de lage rij */
+.extra-power .icon-btn {
+  width: 24px;
+  height: 24px;
+  --mdc-icon-size: 16px;
+}
+
 .extra-power + .extra-power {
   margin-top: calc(2px - var(--cc-entry-gap));
 }
@@ -901,22 +915,10 @@ ha-card {
   object-fit: cover;
 }
 
-.icon-btn.has-picture {
-  background: none;
-}
-
+/* De ronde achtergrond van de knop blijft zichtbaar achter (transparante delen van) de afbeelding;
+   bij hover krijgt die de accenttint */
 .icon-btn.has-picture ha-icon {
   display: none;
-}
-
-@media (hover: hover) {
-  .icon-btn.has-picture:not(:disabled):hover {
-    background: none;
-  }
-
-  .icon-btn.has-picture:not(:disabled):hover .icon-btn-img {
-    opacity: 0.85;
-  }
 }
 
 .icon-btn:focus-visible {
