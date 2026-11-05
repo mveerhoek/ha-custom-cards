@@ -325,6 +325,13 @@
         }
       }
 
+      // Relatieve URL's (zoals /api/media_player_proxy/...) krijgen de basis-URL van Home Assistant
+      _resolveUrl(url) {
+        if (/^(https?:|data:|blob:)/i.test(url)) return url;
+
+        return this._hass?.hassUrl ? this._hass.hassUrl(url) : url;
+      }
+
       // Status als leesbare (vertaalde) tekst
       _stateText(state) {
         return this._hass?.formatEntityState ? this._hass.formatEntityState(state) : state.state;
@@ -389,11 +396,46 @@
         el.append(icon);
         el.addEventListener("click", onClick);
 
+        // Optionele afbeelding (bijv. albumhoes): vervangt het icoon zolang die geladen kan worden
+        let img = null;
+        let failedUrl = null;
+
+        const setPicture = (url) => {
+          if (url && url !== failedUrl) {
+            if (!img) {
+              img = document.createElement("img");
+              img.className = "icon-btn-img";
+              img.alt = "";
+              img.draggable = false;
+              img.addEventListener("error", () => {
+                failedUrl = img.dataset.url;
+                el.classList.remove("has-picture");
+                img.removeAttribute("src");
+                img.hidden = true;
+              });
+              el.append(img);
+            }
+
+            if (img.dataset.url !== url) {
+              img.dataset.url = url;
+              img.src = url;
+            }
+
+            img.hidden = false;
+            el.classList.add("has-picture");
+          } else {
+            if (!url) failedUrl = null;
+            if (img) img.hidden = true;
+            el.classList.remove("has-picture");
+          }
+        };
+
         return {
           el,
           setIcon: (name) => {
             if (icon.icon !== name) icon.icon = name;
-          }
+          },
+          setPicture
         };
       }
 
@@ -490,6 +532,10 @@
           const active = isAvailable(state) && state.state !== "off";
 
           info.setIcon(extra.icon || attrs.icon || MEDIA_ICONS[attrs.device_class] || "mdi:speaker");
+
+          // Albumhoes of andere graphic van de speler; zonder graphic blijft het icoon staan
+          const picture = isAvailable(state) ? attrs.entity_picture_local || attrs.entity_picture : null;
+          info.setPicture(picture ? this._resolveUrl(picture) : null);
 
           // Bovenste regel (dik): titel van het nummer, anders de naam van de speler.
           // Onderste regel: artiest, anders de bron (bijv. NPO Radio 2), anders de status.
@@ -655,30 +701,21 @@
 
       // ----- Extra element: stroomschakelaar -----
 
-      // Eén rij: icoon | naam (dik) | vermogen + status van de binary sensor (rechts)
+      // Compacte rij: icoon | naam (dik) | vermogen | status binary sensor | schakelaar
       _buildPowerSwitch(extra) {
         const el = document.createElement("div");
-        el.className = "extra";
+        el.className = "extra extra-power";
 
         const view = document.createElement("div");
         view.className = "extra-view";
 
-        // De status van de schakelaar is altijd te zien: het icoon kleurt oranje als hij aan staat.
-        // Alleen met switchable: true komt er ook een klikbare cirkel omheen.
+        // Icoon: altijd grijs
         const iconWrap = document.createElement("div");
-        iconWrap.className = "entry-icon";
+        iconWrap.className = "power-icon";
 
         const icon = document.createElement("ha-icon");
         icon.icon = extra.icon || "mdi:power-socket-eu";
         iconWrap.append(icon);
-
-        if (extra.switchable) {
-          iconWrap.classList.add("switchable");
-          iconWrap.setAttribute("role", "switch");
-          iconWrap.setAttribute("tabindex", "0");
-
-          this._onActivate(iconWrap, () => this._toggle(extra.entity), { stopPropagation: true });
-        }
 
         const labels = document.createElement("div");
         labels.className = "extra-labels";
@@ -715,6 +752,24 @@
           right.append(statusWrap);
         }
 
+        // Schakelaar aan het eind van de rij: toont altijd de status van de switch,
+        // en is alleen klikbaar met switchable: true
+        const toggle = document.createElement("span");
+        toggle.className = "power-toggle";
+
+        const toggleIcon = document.createElement("ha-icon");
+        toggle.append(toggleIcon);
+
+        if (extra.switchable) {
+          toggle.classList.add("switchable");
+          toggle.setAttribute("role", "switch");
+          toggle.setAttribute("tabindex", "0");
+
+          this._onActivate(toggle, () => this._toggle(extra.entity), { stopPropagation: true });
+        }
+
+        right.append(toggle);
+
         view.append(iconWrap, labels, right);
         el.append(view);
 
@@ -722,15 +777,6 @@
           const state = this._getState(extra.entity);
           const isOn = state?.state === "on";
           const text = extra.name || state?.attributes?.friendly_name || extra.entity;
-
-          iconWrap.classList.toggle("on", isOn);
-          iconWrap.classList.toggle("unavailable", !state || state.state === "unavailable");
-          iconWrap.title = state ? this._stateText(state) : "—";
-
-          if (extra.switchable) {
-            iconWrap.setAttribute("aria-checked", String(isOn));
-            iconWrap.setAttribute("aria-label", text);
-          }
 
           name.textContent = text;
           name.title = text;
@@ -750,8 +796,22 @@
               if (statusIcon.icon !== fallback) statusIcon.icon = fallback;
             }
 
+            statusWrap.classList.toggle("on", status?.state === "on");
             statusWrap.classList.toggle("unavailable", !status || status.state === "unavailable");
             statusWrap.title = status ? this._stateText(status) : "—";
+          }
+
+          const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
+
+          if (toggleIcon.icon !== toggleName) toggleIcon.icon = toggleName;
+
+          toggle.classList.toggle("on", isOn);
+          toggle.classList.toggle("unavailable", !state || state.state === "unavailable");
+          toggle.title = state ? this._stateText(state) : "—";
+
+          if (extra.switchable) {
+            toggle.setAttribute("aria-checked", String(isOn));
+            toggle.setAttribute("aria-label", text);
           }
         };
 
