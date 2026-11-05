@@ -712,6 +712,15 @@ ha-card {
   transition: background 0.15s, color 0.15s;
 }
 
+/* Een aan-status kleurt het icoon ook zonder schakelbare cirkel */
+.entry-icon.on {
+  color: var(--cc-switch-color);
+}
+
+.entry-icon.unavailable {
+  opacity: 0.5;
+}
+
 .entry-icon.switchable {
   cursor: pointer;
   user-select: none;
@@ -768,6 +777,31 @@ ha-card {
 .extra-labels {
   flex: 1;
   min-width: 0;
+}
+
+/* Stroomschakelaar: rechts uitgelijnd vermogen en status van de binary sensor */
+.extra-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.extra-value {
+  color: var(--secondary-text-color);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.extra-state-icon {
+  display: inline-flex;
+  --mdc-icon-size: 20px;
+  color: var(--secondary-text-color);
+}
+
+.extra-state-icon.unavailable {
+  opacity: 0.5;
 }
 
 /* Rij met een lange-druk-actie: geen tekstselectie of oproepmenu bij vasthouden */
