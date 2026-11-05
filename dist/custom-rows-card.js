@@ -655,30 +655,21 @@
 
       // ----- Extra element: stroomschakelaar -----
 
-      // Eén rij: icoon | naam (dik) | vermogen + status van de binary sensor (rechts)
+      // Compacte rij: icoon | naam (dik) | vermogen | status binary sensor | schakelaar
       _buildPowerSwitch(extra) {
         const el = document.createElement("div");
-        el.className = "extra";
+        el.className = "extra extra-power";
 
         const view = document.createElement("div");
         view.className = "extra-view";
 
-        // De status van de schakelaar is altijd te zien: het icoon kleurt oranje als hij aan staat.
-        // Alleen met switchable: true komt er ook een klikbare cirkel omheen.
+        // Icoon: altijd grijs
         const iconWrap = document.createElement("div");
-        iconWrap.className = "entry-icon";
+        iconWrap.className = "power-icon";
 
         const icon = document.createElement("ha-icon");
         icon.icon = extra.icon || "mdi:power-socket-eu";
         iconWrap.append(icon);
-
-        if (extra.switchable) {
-          iconWrap.classList.add("switchable");
-          iconWrap.setAttribute("role", "switch");
-          iconWrap.setAttribute("tabindex", "0");
-
-          this._onActivate(iconWrap, () => this._toggle(extra.entity), { stopPropagation: true });
-        }
 
         const labels = document.createElement("div");
         labels.className = "extra-labels";
@@ -715,6 +706,24 @@
           right.append(statusWrap);
         }
 
+        // Schakelaar aan het eind van de rij: toont altijd de status van de switch,
+        // en is alleen klikbaar met switchable: true
+        const toggle = document.createElement("span");
+        toggle.className = "power-toggle";
+
+        const toggleIcon = document.createElement("ha-icon");
+        toggle.append(toggleIcon);
+
+        if (extra.switchable) {
+          toggle.classList.add("switchable");
+          toggle.setAttribute("role", "switch");
+          toggle.setAttribute("tabindex", "0");
+
+          this._onActivate(toggle, () => this._toggle(extra.entity), { stopPropagation: true });
+        }
+
+        right.append(toggle);
+
         view.append(iconWrap, labels, right);
         el.append(view);
 
@@ -722,15 +731,6 @@
           const state = this._getState(extra.entity);
           const isOn = state?.state === "on";
           const text = extra.name || state?.attributes?.friendly_name || extra.entity;
-
-          iconWrap.classList.toggle("on", isOn);
-          iconWrap.classList.toggle("unavailable", !state || state.state === "unavailable");
-          iconWrap.title = state ? this._stateText(state) : "—";
-
-          if (extra.switchable) {
-            iconWrap.setAttribute("aria-checked", String(isOn));
-            iconWrap.setAttribute("aria-label", text);
-          }
 
           name.textContent = text;
           name.title = text;
@@ -750,8 +750,22 @@
               if (statusIcon.icon !== fallback) statusIcon.icon = fallback;
             }
 
+            statusWrap.classList.toggle("on", status?.state === "on");
             statusWrap.classList.toggle("unavailable", !status || status.state === "unavailable");
             statusWrap.title = status ? this._stateText(status) : "—";
+          }
+
+          const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
+
+          if (toggleIcon.icon !== toggleName) toggleIcon.icon = toggleName;
+
+          toggle.classList.toggle("on", isOn);
+          toggle.classList.toggle("unavailable", !state || state.state === "unavailable");
+          toggle.title = state ? this._stateText(state) : "—";
+
+          if (extra.switchable) {
+            toggle.setAttribute("aria-checked", String(isOn));
+            toggle.setAttribute("aria-label", text);
           }
         };
 

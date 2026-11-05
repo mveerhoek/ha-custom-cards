@@ -608,6 +608,8 @@ ha-card {
   --cc-switch-color: #ff9800; /* kleur van een actieve schakelaar/lamp */
   --cc-heat-color: #f44336;   /* climate-icoon tijdens verwarmen */
   --cc-cool-color: #2196f3;   /* climate-icoon tijdens koelen */
+  --cc-power-on-color: var(--success-color, #4caf50); /* stroomschakelaar: aan */
+  --cc-power-status-color: #8bc34a;                    /* stroomschakelaar: binary sensor aan (light green) */
 }
 
 /* Regels onder elkaar; de kaart zet het aantal kolommen (1 of 2) en de kolomafstand.
@@ -712,15 +714,6 @@ ha-card {
   transition: background 0.15s, color 0.15s;
 }
 
-/* Een aan-status kleurt het icoon ook zonder schakelbare cirkel */
-.entry-icon.on {
-  color: var(--cc-switch-color);
-}
-
-.entry-icon.unavailable {
-  opacity: 0.5;
-}
-
 .entry-icon.switchable {
   cursor: pointer;
   user-select: none;
@@ -779,7 +772,26 @@ ha-card {
   min-width: 0;
 }
 
-/* Stroomschakelaar: rechts uitgelijnd vermogen en status van de binary sensor */
+/* Stroomschakelaar (power_switch): compacte rij */
+.extra-power .extra-view {
+  min-height: 24px;
+}
+
+/* Opeenvolgende stroomschakelaars staan dichter op elkaar */
+.extra-power + .extra-power {
+  margin-top: calc(2px - var(--cc-entry-gap));
+}
+
+.power-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px; /* gelijk aan de icoonknoppen van de andere extra elementen */
+  --mdc-icon-size: 20px;
+  color: var(--secondary-text-color);
+}
+
 .extra-right {
   display: flex;
   align-items: center;
@@ -794,14 +806,59 @@ ha-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* Binary sensor: grijs, light green als hij aan staat */
 .extra-state-icon {
   display: inline-flex;
-  --mdc-icon-size: 20px;
+  --mdc-icon-size: 18px;
   color: var(--secondary-text-color);
+}
+
+.extra-state-icon.on {
+  color: var(--cc-power-status-color);
 }
 
 .extra-state-icon.unavailable {
   opacity: 0.5;
+}
+
+/* Schakelaar: grijs uit, groen aan; alleen klikbaar met .switchable */
+.power-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  --mdc-icon-size: 24px;
+  color: var(--secondary-text-color);
+  transition: color 0.15s;
+}
+
+.power-toggle.on {
+  color: var(--cc-power-on-color);
+}
+
+.power-toggle.unavailable {
+  opacity: 0.5;
+}
+
+.power-toggle.switchable {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+}
+
+.power-toggle.switchable.unavailable {
+  cursor: default;
+}
+
+.power-toggle.switchable:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .power-toggle.switchable:not(.on):not(.unavailable):hover {
+    color: var(--primary-color);
+  }
 }
 
 /* Rij met een lange-druk-actie: geen tekstselectie of oproepmenu bij vasthouden */
