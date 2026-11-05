@@ -413,8 +413,17 @@
         // Hoofdweergave: icoon (more-info) | bron-info | play/pause | volume
         const info = this._iconButton(() => this._openMoreInfo(extra.entity));
 
-        const label = document.createElement("div");
-        label.className = "extra-label";
+        // Twee regels, net als bij de climate: dik bovenaan, normaal eronder
+        const labels = document.createElement("div");
+        labels.className = "extra-labels";
+
+        const name = document.createElement("div");
+        name.className = "entry-name";
+
+        const status = document.createElement("div");
+        status.className = "extra-status";
+
+        labels.append(name, status);
 
         const play = this._iconButton(() =>
           this._callService("media_player", "media_play_pause", { entity_id: extra.entity })
@@ -422,7 +431,7 @@
 
         const volume = this._iconButton(() => showVolume(true));
 
-        main.append(info.el, label, play.el, volume.el);
+        main.append(info.el, labels, play.el, volume.el);
 
         // Volumeweergave: mute | slider | annuleren
         const mute = this._iconButton(() => {
@@ -477,12 +486,20 @@
 
           info.setIcon(extra.icon || attrs.icon || MEDIA_ICONS[attrs.device_class] || "mdi:speaker");
 
-          // Bron-info: artiest en titel; zonder die de bron, anders de status
-          const track = [attrs.media_artist, attrs.media_title].filter(Boolean).join(" – ");
-          const text = track || attrs.source || (state ? this._stateText(state) : "—");
+          // Bovenste regel (dik): titel van het nummer, anders de naam van de speler.
+          // Onderste regel: artiest, anders de bron (bijv. NPO Radio 2), anders de status.
+          const title = attrs.media_title;
+          const artist = attrs.media_artist;
+          const source = attrs.source;
+          const stateText = state ? this._stateText(state) : "—";
 
-          label.textContent = text;
-          label.title = text;
+          const top = title || extra.name || attrs.friendly_name || extra.entity;
+          const bottom = (title && artist) || source || stateText;
+
+          name.textContent = top;
+          name.title = top;
+          status.textContent = bottom;
+          status.title = bottom;
 
           play.setIcon(state?.state === "playing" ? "mdi:pause" : "mdi:play");
           play.el.disabled = !active;
@@ -608,6 +625,13 @@
           status.textContent = state ? this._stateText(state) : "—";
 
           info.setIcon(extra.icon || CLIMATE_ICONS[state?.state] || "mdi:thermostat");
+
+          // Kleur volgens wat het toestel nu doet (hvac_action); heeft het toestel dat
+          // attribuut niet, dan geldt de ingestelde modus (heat / cool)
+          const action = attrs.hvac_action ?? (state?.state === "heat" ? "heating" : state?.state === "cool" ? "cooling" : null);
+
+          info.el.classList.toggle("heating", action === "heating" || action === "preheating");
+          info.el.classList.toggle("cooling", action === "cooling");
 
           const current = control.pending ?? toNumber(attrs.temperature);
           const unit = this._hass?.config?.unit_system?.temperature || "°C";
