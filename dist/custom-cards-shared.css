@@ -889,6 +889,36 @@ ha-card {
   transition: background 0.15s, color 0.15s;
 }
 
+/* Albumhoes (of andere graphic) in plaats van het icoon */
+.icon-btn {
+  overflow: hidden;
+}
+
+.icon-btn-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.icon-btn.has-picture {
+  background: none;
+}
+
+.icon-btn.has-picture ha-icon {
+  display: none;
+}
+
+@media (hover: hover) {
+  .icon-btn.has-picture:not(:disabled):hover {
+    background: none;
+  }
+
+  .icon-btn.has-picture:not(:disabled):hover .icon-btn-img {
+    opacity: 0.85;
+  }
+}
+
 .icon-btn:focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 2px;

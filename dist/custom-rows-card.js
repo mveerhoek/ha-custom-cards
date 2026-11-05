@@ -325,6 +325,13 @@
         }
       }
 
+      // Relatieve URL's (zoals /api/media_player_proxy/...) krijgen de basis-URL van Home Assistant
+      _resolveUrl(url) {
+        if (/^(https?:|data:|blob:)/i.test(url)) return url;
+
+        return this._hass?.hassUrl ? this._hass.hassUrl(url) : url;
+      }
+
       // Status als leesbare (vertaalde) tekst
       _stateText(state) {
         return this._hass?.formatEntityState ? this._hass.formatEntityState(state) : state.state;
@@ -389,11 +396,46 @@
         el.append(icon);
         el.addEventListener("click", onClick);
 
+        // Optionele afbeelding (bijv. albumhoes): vervangt het icoon zolang die geladen kan worden
+        let img = null;
+        let failedUrl = null;
+
+        const setPicture = (url) => {
+          if (url && url !== failedUrl) {
+            if (!img) {
+              img = document.createElement("img");
+              img.className = "icon-btn-img";
+              img.alt = "";
+              img.draggable = false;
+              img.addEventListener("error", () => {
+                failedUrl = img.dataset.url;
+                el.classList.remove("has-picture");
+                img.removeAttribute("src");
+                img.hidden = true;
+              });
+              el.append(img);
+            }
+
+            if (img.dataset.url !== url) {
+              img.dataset.url = url;
+              img.src = url;
+            }
+
+            img.hidden = false;
+            el.classList.add("has-picture");
+          } else {
+            if (!url) failedUrl = null;
+            if (img) img.hidden = true;
+            el.classList.remove("has-picture");
+          }
+        };
+
         return {
           el,
           setIcon: (name) => {
             if (icon.icon !== name) icon.icon = name;
-          }
+          },
+          setPicture
         };
       }
 
@@ -490,6 +532,10 @@
           const active = isAvailable(state) && state.state !== "off";
 
           info.setIcon(extra.icon || attrs.icon || MEDIA_ICONS[attrs.device_class] || "mdi:speaker");
+
+          // Albumhoes of andere graphic van de speler; zonder graphic blijft het icoon staan
+          const picture = isAvailable(state) ? attrs.entity_picture_local || attrs.entity_picture : null;
+          info.setPicture(picture ? this._resolveUrl(picture) : null);
 
           // Bovenste regel (dik): titel van het nummer, anders de naam van de speler.
           // Onderste regel: artiest, anders de bron (bijv. NPO Radio 2), anders de status.
