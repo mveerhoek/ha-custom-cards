@@ -7,6 +7,8 @@
     const VALUES = [
       { key: "temperature", decimals: 1, unit: "°C" },
       { key: "humidity", decimals: 0, unit: "%" },
+      { key: "illuminance", decimals: 0, unit: "lx" },
+      { key: "pressure", decimals: 0, unit: "hPa" },
       { key: "power", decimals: 0, unit: "W" }
     ];
 
@@ -87,6 +89,8 @@
             switch: entry.switch, // optioneel: schakelaar of lamp
             temperature: entry.temperature,
             humidity: entry.humidity,
+            illuminance: entry.illuminance,
+            pressure: entry.pressure,
             power: entry.power,
             extras
           };
@@ -157,6 +161,7 @@
 
           // Tweede regel: alleen de geconfigureerde waarden, gescheiden door een punt
           const values = [];
+          let summaryRowEl = null;
           const defs = VALUES.filter((def) => entry[def.key]);
 
           if (defs.length) {
@@ -165,10 +170,13 @@
 
             const row = document.createElement("div");
             row.className = "summary-row";
+            summaryRowEl = row;
 
             defs.forEach((def, valueIndex) => {
+              let separator = null;
+
               if (valueIndex > 0) {
-                const separator = document.createElement("span");
+                separator = document.createElement("span");
                 separator.textContent = "·";
                 row.append(separator);
               }
@@ -176,7 +184,7 @@
               const valueEl = document.createElement("span");
               this._makeClickable(valueEl, entry[def.key]);
               row.append(valueEl);
-              values.push({ el: valueEl, ...def });
+              values.push({ el: valueEl, sep: separator, ...def });
             });
 
             summary.append(row);
@@ -214,7 +222,7 @@
             this._onActivate(head, () => this._toggleExpanded(index));
           }
 
-          const row = { el, head, extrasEl, entry, iconWrap, values, extras };
+          const row = { el, head, extrasEl, entry, iconWrap, values, extras, summaryRow: summaryRowEl };
 
           this._applyOpen(row, this._expanded.has(index));
 
@@ -234,7 +242,10 @@
           const width = records[0].contentRect.width;
           const columns = width >= 2 * MIN_COLUMN_WIDTH + COLUMN_GAP ? 2 : 1;
 
+          // Bij een nieuw aantal kolommen worden de regels opnieuw geplaatst (en gemeten);
+          // anders kan alleen de beschikbare breedte veranderd zijn
           if (columns !== this._columns) this._applyLayout(columns);
+          else this._fitSummaries();
         });
         this._observer.observe(grid);
 
@@ -278,6 +289,30 @@
         });
 
         this._grid.replaceChildren(...children);
+        this._fitSummaries();
+      }
+
+      // Past de tweede regel (waarden) in de beschikbare breedte: van achteren af verdwijnen hele
+      // waarden (met hun scheidingspunt) zodat er nooit een afgeknipte waarde zichtbaar is.
+      _fitSummaries() {
+        (this._rows || []).forEach(({ values, summaryRow }) => {
+          if (!summaryRow || !values.length) return;
+
+          values.forEach(({ el, sep }) => {
+            el.hidden = false;
+            if (sep) sep.hidden = false;
+          });
+
+          // Nog niet zichtbaar of niet gemeten: laat alles staan
+          if (!summaryRow.clientWidth) return;
+
+          for (let i = values.length - 1; i >= 0; i--) {
+            if (summaryRow.scrollWidth - summaryRow.clientWidth <= 1) break;
+
+            values[i].el.hidden = true;
+            if (values[i].sep) values[i].sep.hidden = true;
+          }
+        });
       }
 
       // ----- Uit- en inklappen -----
@@ -920,6 +955,9 @@
 
           extras.forEach((extra) => extra.update());
         });
+
+        // Nieuwe waarden zijn mogelijk breder of smaller geworden
+        this._fitSummaries();
       }
 
       getCardSize() {

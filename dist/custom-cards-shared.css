@@ -685,7 +685,14 @@ ha-card {
   white-space: nowrap;
 }
 
-/* Tweede regel: temperatuur, luchtvochtigheid en vermogen (rij-opmaak: .summary-row) */
+/* Tweede regel: temperatuur, luchtvochtigheid, lichtintensiteit, luchtdruk en vermogen
+   (rij-opmaak: .summary-row). Eén regel: past niet alles, dan laat de kaart de laatste
+   waarden helemaal weg (zie _fitSummaries), zodat er niets afgeknipt wordt. */
+.entry-summary .summary-row {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
 .entry-summary,
 .extra-status {
   color: var(--secondary-text-color);
