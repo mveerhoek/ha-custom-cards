@@ -5,8 +5,9 @@
 
     class CustomNetworkInfrastructureCard extends CardBase {
       setConfig(config) {
+        this._configError = null;
         if (!config.name) {
-          throw new Error("Set a name using the name option.");
+          return this._invalidConfig("error.name");
         }
 
         this._config = {
