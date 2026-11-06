@@ -5,22 +5,27 @@
 
     class DockerCombinedCard extends CardBase {
       setConfig(config) {
-        const projects = (config.projects || []).map((project, index) => {
+        this._configError = null;
+        let projects;
+        try {
+        projects = (config.projects || []).map((project, index) => {
           const name = project.name || project.project;
 
           if (!name) {
-            throw new Error(`Project ${index + 1}: set a name using the name option.`);
+            throw { key: "error.project_name", params: { index: index + 1 } };
           }
 
           if (!Array.isArray(project.containers) || !project.containers.length) {
-            throw new Error(
-              `Project "${name}": add at least one container using the containers option.`
-            );
+            throw { key: "error.project_containers", params: { name } };
           }
 
           return { name, containers: project.containers };
         });
 
+        } catch (error) {
+          if (!error.key) throw error;
+          return this._invalidConfig(error.key, error.params);
+        }
         this._config = {
           css_url: config.css_url, // optioneel: pad naar de gedeelde stylesheet
           entity_prefix: config.entity_prefix || "unraid_docker_",
