@@ -17,7 +17,7 @@
     const COLUMN_GAP = 20; // px
 
     // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate", "power_switch"];
+    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover"];
     const DEFAULT_STEP = 0.5; // °C per klik bij een climate
 
     const MEDIA_ICONS = {
@@ -34,6 +34,12 @@
       dry: "mdi:water-percent",
       fan_only: "mdi:fan",
       off: "mdi:power"
+    };
+
+    // Labels (aria) van het cover-element; de rest van de kaart gebruikt de vertalingen uit custom-cards-shared.js
+    const COVER_LABELS = {
+      en: { toggle: "Open or close", close: "Close", open: "Open", slider: "Set position", position: "Position", back: "Back" },
+      nl: { toggle: "Openen of sluiten", close: "Sluiten", open: "Openen", slider: "Positie instellen", position: "Positie", back: "Terug" }
     };
 
     const isAvailable = (state) =>
@@ -310,6 +316,7 @@
             extras = entry.extras.map((extra) => {
               if (extra.type === "climate") return this._buildClimate(extra);
               if (extra.type === "power_switch") return this._buildPowerSwitch(extra);
+              if (extra.type === "cover") return this._buildCover(extra);
               return this._buildMedia(extra);
             });
             extrasEl.append(...extras.map((extra) => extra.el));
@@ -896,6 +903,162 @@
         return { el, update, dispose };
       }
 
+      // ----- Extra element: cover (zonwering) -----
+
+      _coverLabel(key) {
+        const lang = String(this._language || "en").slice(0, 2).toLowerCase();
+
+        return (COVER_LABELS[lang] || COVER_LABELS.en)[key];
+      }
+
+      // Hoofdweergave: [open/dicht] | naam boven status + percentage | [omlaag] [omhoog] [slider]
+      // Sliderweergave: slider over de volle breedte | [terug]
+      _buildCover(extra) {
+        const el = document.createElement("div");
+        el.className = "extra";
+
+        const main = document.createElement("div");
+        main.className = "extra-view";
+
+        const sliderView = document.createElement("div");
+        sliderView.className = "extra-view";
+        sliderView.hidden = true;
+
+        const showSlider = (show) => {
+          main.hidden = show;
+          sliderView.hidden = !show;
+        };
+
+        const call = (service, data = {}) =>
+          this._callService("cover", service, { entity_id: extra.entity, ...data });
+
+        // Links: schakelt tussen open en dicht
+        const info = this._iconButton(() => call("toggle"));
+
+        const labels = document.createElement("div");
+        labels.className = "extra-labels";
+
+        const name = document.createElement("div");
+        name.className = "entry-name";
+
+        const status = document.createElement("div");
+        status.className = "extra-status";
+
+        labels.append(name, status);
+
+        // Rechts: sluiten, openen, naar de slider
+        const buttons = document.createElement("div");
+        buttons.className = "stepper";
+
+        const close = this._iconButton(() => call("close_cover"));
+        close.setIcon("mdi:arrow-down");
+
+        const open = this._iconButton(() => call("open_cover"));
+        open.setIcon("mdi:arrow-up");
+
+        const swipe = this._iconButton(() => showSlider(true));
+        swipe.setIcon("mdi:gesture-swipe-horizontal");
+
+        buttons.append(close.el, open.el, swipe.el);
+        main.append(info.el, labels, buttons);
+
+        // Sliderweergave: slider (percentage open) | terug naar de hoofdweergave
+        const slider = document.createElement("input");
+        slider.type = "range";
+        slider.min = "0";
+        slider.max = "100";
+        slider.step = "1";
+        slider.className = "volume-slider";
+
+        const back = this._iconButton(() => showSlider(false));
+        back.setIcon("mdi:gesture-tap-button");
+
+        sliderView.append(slider, back.el);
+        el.append(main, sliderView);
+
+        // Tijdens het slepen overschrijft een statusupdate de slider niet; de positie wordt
+        // hooguit ongeveer 6 keer per seconde doorgegeven en bij loslaten direct. Na loslaten
+        // toont de slider de gekozen positie tot de cover er is.
+        const control = { dragging: false, dragTimer: null, sendTimer: null, level: 0, target: null, holdUntil: 0 };
+
+        const send = () => {
+          clearTimeout(control.sendTimer);
+          control.sendTimer = null;
+          call("set_cover_position", { position: control.level });
+        };
+
+        slider.addEventListener("input", () => {
+          control.dragging = true;
+          clearTimeout(control.dragTimer);
+          control.dragTimer = setTimeout(() => { control.dragging = false; }, 1500);
+
+          control.level = Number(slider.value);
+          control.target = control.level;
+
+          if (!control.sendTimer) control.sendTimer = setTimeout(send, 150);
+        });
+
+        slider.addEventListener("change", () => {
+          clearTimeout(control.dragTimer);
+          control.dragging = false;
+          control.level = Number(slider.value);
+          control.target = control.level;
+          control.holdUntil = Date.now() + 4000;
+          send();
+        });
+
+        const update = () => {
+          const state = this._getState(extra.entity);
+          const attrs = state?.attributes || {};
+          const available = isAvailable(state);
+          const moving = state?.state === "opening" || state?.state === "closing";
+          const position = toNumber(attrs.current_position);
+          const title = extra.name || attrs.friendly_name || extra.entity;
+
+          name.textContent = title;
+          name.title = title;
+
+          // Status (open, dicht, ...) en daarachter hoe ver de cover open is
+          let text = state ? this._stateText(state) : "—";
+          if (available && position !== null) text += ` · ${Math.round(position)}%`;
+
+          status.textContent = text;
+          status.title = text;
+
+          info.setIcon(extra.icon || "mdi:window-open");
+          info.el.disabled = !available;
+
+          const fullyOpen = position !== null ? position >= 100 : state?.state === "open";
+
+          close.el.disabled = !available || (!moving && state.state === "closed");
+          open.el.disabled = !available || (!moving && fullyOpen);
+          swipe.el.disabled = !available || position === null;
+          slider.disabled = !available || position === null;
+
+          info.el.setAttribute("aria-label", `${this._coverLabel("toggle")}: ${title}`);
+          close.el.setAttribute("aria-label", this._coverLabel("close"));
+          open.el.setAttribute("aria-label", this._coverLabel("open"));
+          swipe.el.setAttribute("aria-label", this._coverLabel("slider"));
+          slider.setAttribute("aria-label", this._coverLabel("position"));
+          back.el.setAttribute("aria-label", this._coverLabel("back"));
+
+          const holding = control.target !== null && (moving || Date.now() < control.holdUntil);
+
+          if (!holding && !control.dragging) control.target = null;
+
+          if (!control.dragging && position !== null) {
+            slider.value = String(Math.round(holding ? control.target : position));
+          }
+        };
+
+        const dispose = () => {
+          clearTimeout(control.dragTimer);
+          if (control.sendTimer) send();
+        };
+
+        return { el, update, dispose };
+      }
+
       // ----- Extra element: stroomschakelaar -----
 
       // Compacte rij: icoon | naam (dik) | vermogen | status binary sensor | schakelaar
@@ -1148,7 +1311,7 @@
     registerCard("custom-rows-card", CustomRowsCard, {
       id: "rows",
       name: "Custom Rows Card",
-      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / power switch elements.",
+      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / power switch elements.",
       editor: {
         schema: [
           { name: "entries", selector: { object: {} } },
