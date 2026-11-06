@@ -173,18 +173,32 @@
         this._build();
       }
 
+      _invalidConfig(key, params) {
+        this._disposeControls();
+        return super._invalidConfig(key, params);
+      }
+
       connectedCallback() {
-        if (this._observer && this._grid) this._observer.observe(this._grid);
+        if (this._disposed) {
+          this._disposed = false;
+          this._build();
+        } else if (this._observer && this._grid) this._observer.observe(this._grid);
       }
 
       disconnectedCallback() {
+        this._disposeControls();
+        this._disposed = true;
+      }
+
+      _disposeControls() {
         this._observer?.disconnect();
+        (this._rows || []).forEach((row) => row.extras.forEach((extra) => extra.dispose?.()));
       }
 
       _build() {
         if (!this._ensureShadow()) return;
 
-        this._observer?.disconnect();
+        this._disposeControls();
 
         const card = document.createElement("ha-card");
 
@@ -476,6 +490,8 @@
         let pointerId = null;
         let startX = 0;
         let startY = 0;
+        let fadeTimer = null;
+        let completedIndicator = null;
 
         const cancel = () => {
           clearTimeout(timer);
@@ -505,8 +521,11 @@
             pointerId = null;
             const completed = indicator;
             indicator = null;
+            completedIndicator?.remove();
+            clearTimeout(fadeTimer);
+            completedIndicator = completed;
             completed?.classList.add("complete");
-            setTimeout(() => completed?.remove(), 300);
+            fadeTimer = setTimeout(() => { completed?.remove(); completedIndicator = null; }, 300);
             navigator.vibrate?.(30);
             handler();
           }, delay);
@@ -519,6 +538,7 @@
           element.addEventListener(type, (event) => { if (event.pointerId === pointerId) cancel(); })
         );
         element.addEventListener("contextmenu", (event) => event.preventDefault());
+        return () => { cancel(); clearTimeout(fadeTimer); completedIndicator?.remove(); };
       }
 
       // Ronde icoonknop; geeft het element en een functie om het icoon te wisselen
@@ -711,7 +731,15 @@
           }
         };
 
-        return { el, update };
+        const dispose = () => {
+          clearTimeout(control.dragTimer);
+          if (control.sendTimer) {
+            clearTimeout(control.sendTimer);
+            control.sendTimer = null;
+            this._callService("media_player", "volume_set", { entity_id: extra.entity, volume_level: control.level / 100 });
+          }
+        };
+        return { el, update, dispose };
       }
 
       // ----- Extra element: climate -----
@@ -756,7 +784,7 @@
         // Lang indrukken op de rij: uit -> aan, anders -> uit
         el.classList.add("long-press");
 
-        this._onLongPress(el, () => {
+        const disposeLongPress = this._onLongPress(el, () => {
           const state = this._getState(extra.entity);
 
           if (!isAvailable(state)) return;
@@ -768,7 +796,7 @@
 
         // Snel achter elkaar klikken: de gekozen waarde wordt direct getoond en na een
         // korte pauze in één keer doorgegeven aan Home Assistant.
-        const control = { pending: null, sendTimer: null, clearTimer: null };
+        const control = { pending: null, sendTimer: null, clearTimer: null, disposed: false };
 
         const attributes = () => this._getState(extra.entity)?.attributes || {};
 
@@ -793,6 +821,7 @@
           update();
 
           control.sendTimer = setTimeout(async () => {
+            control.sendTimer = null;
             const target = control.pending;
 
             await this._callService("climate", "set_temperature", {
@@ -800,6 +829,7 @@
               temperature: target
             });
 
+            if (control.disposed) return;
             // Even wachten tot de nieuwe status binnen is, daarna volgt het label de entiteit weer
             control.clearTimer = setTimeout(() => {
               control.pending = null;
@@ -839,7 +869,17 @@
           plus.el.disabled = !available || current === null || (max !== null && current >= max);
         };
 
-        return { el, update };
+        const dispose = () => {
+          disposeLongPress();
+          control.disposed = true;
+          clearTimeout(control.clearTimer);
+          if (control.sendTimer) {
+            clearTimeout(control.sendTimer);
+            control.sendTimer = null;
+            this._callService("climate", "set_temperature", { entity_id: extra.entity, temperature: control.pending });
+          }
+        };
+        return { el, update, dispose };
       }
 
       // ----- Extra element: stroomschakelaar -----
@@ -1020,7 +1060,7 @@
           }
         };
 
-        return { el, update };
+        return { el, update, dispose: () => clearTimeout(confirmTimer) };
       }
 
       // ----- Bijwerken -----
@@ -1048,6 +1088,7 @@
       _update() {
         if (!this._hass || !this._rows) return;
 
+        let summaryChanged = false;
         this._rows.forEach(({ entry, iconWrap, values, extras, badges }) => {
           if (entry.switch) {
             const state = this._getState(entry.switch);
@@ -1074,14 +1115,15 @@
           });
 
           values.forEach(({ el, key, decimals, unit }) => {
-            el.textContent = this._formatValue(entry[key], decimals, unit);
+            const text = this._formatValue(entry[key], decimals, unit);
+            if (el.textContent !== text) { el.textContent = text; summaryChanged = true; }
           });
 
           extras.forEach((extra) => extra.update());
         });
 
         // Nieuwe waarden zijn mogelijk breder of smaller geworden
-        this._fitSummaries();
+        if (summaryChanged) this._fitSummaries();
       }
 
       getCardSize() {
