@@ -15,7 +15,7 @@ functionality.
 | **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices |
 | **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks |
 | **Custom Desktop Card** | Desktop computer status and performance |
-| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover) |
+| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light) |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project |
 
 ## Installation
@@ -333,6 +333,12 @@ entity name and icon. Supported types:
   (`mdi:gesture-tap-button`) returns to the normal row. The slider requires a
   cover that reports `current_position`. The close and open buttons are
   disabled while the cover is already fully closed or open.
+- `light`: controls a light. A compact row with the icon (`mdi:lightbulb`,
+  overridable with `icon`), the name (overridable with `name`) and a toggle on
+  the right. When the light is on, the icon takes the colour of the light
+  (`rgb_color`); if the light has no colour, or is off, the icon is orange. The
+  toggle shows `mdi:toggle-switch-variant` in green when on and
+  `mdi:toggle-switch-variant-off` in grey when off. Clicking it switches the light.
 
 ```yaml
 type: custom:custom-rows-card
@@ -358,6 +364,9 @@ entries:
       - type: cover
         entity: cover.living_room_sunscreen
         name: Sunscreen
+      - type: light
+        entity: light.living_room_lamp
+        name: Floor lamp
 ```
 
 `value_order` is set per entry and accepts `temperature`, `humidity`,
