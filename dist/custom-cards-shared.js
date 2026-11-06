@@ -128,7 +128,62 @@
       this._ensureLanguage();
 
       // Pas bijwerken zodra de teksten geladen zijn
-      if (this._strings && !this._configError) this._update();
+      if (this._strings && !this._configError && this._hasRelevantChanges(hass)) this._update();
+    }
+
+    // Vergelijk alleen entiteiten waarop de configuratie betrekking heeft.
+    _observedEntityIds() {
+      const ids = new Set();
+      const visit = (value) => {
+        if (typeof value === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(value)) ids.add(value);
+        else if (Array.isArray(value)) value.forEach(visit);
+        else if (value && typeof value === "object") Object.values(value).forEach(visit);
+      };
+      visit(this._config);
+      return ids;
+    }
+
+    _hasRelevantChanges(hass) {
+      const ids = this._observedEntityIds();
+      const previous = this._observedStates;
+      const current = new Map([...ids].map((id) => [id, hass.states?.[id]]));
+      const changed = !previous || current.size !== previous.size ||
+        [...current].some(([id, state]) => !previous.has(id) || previous.get(id) !== state) ||
+        this._observedConfig !== hass.config || this._observedLocale !== hass.locale ||
+        this._observedLanguage !== hass.language ||
+        this._observedEntities !== hass.entities || this._observedDevices !== hass.devices;
+      this._observedStates = current;
+      this._observedConfig = hass.config;
+      this._observedLocale = hass.locale;
+      this._observedLanguage = hass.language;
+      this._observedEntities = hass.entities;
+      this._observedDevices = hass.devices;
+      return changed;
+    }
+
+    // CPU/RAM/temperatuur worden op dezelfde manier weergegeven op desktop en NAS.
+    _createSystemSummary(row) {
+      return [
+        { key: "cpu", label: this._t("label.cpu"), decimals: 1, unit: "%" },
+        { key: "memory", label: this._t("label.ram"), decimals: 0, unit: "%" },
+        { key: "temperature", label: this._t("label.temp"), decimals: 1, unit: "°C" }
+      ].map((def, index) => {
+        if (index) {
+          const separator = document.createElement("span");
+          separator.textContent = "·";
+          row.append(separator);
+        }
+        const el = document.createElement("span");
+        this._makeClickable(el, this._config[def.key]);
+        row.append(el);
+        return { el, ...def };
+      });
+    }
+
+    _updateSystemSummary() {
+      this._summaryItems.forEach(({ el, key, label, decimals, unit }) => {
+        el.textContent = `${label} ${this._formatSensor(this._config[key], decimals, unit)}`;
+      });
     }
 
     // Teksten zijn (opnieuw) geladen: de kaart wordt opnieuw opgebouwd
@@ -152,6 +207,7 @@
     // Eerste stap van _build(): false als er nog geen configuratie is
     _ensureShadow() {
       if (!this._config) return false;
+      this._observedStates = null;
 
       if (!this.shadowRoot) {
         this.attachShadow({ mode: "open" });

@@ -50,23 +50,7 @@
         summaryRow1.className = "summary-row";
 
         // CPU, RAM en temperatuur: elk apart klikbaar
-        this._summaryItems = [];
-        [
-          { key: "cpu", label: this._t("label.cpu"), decimals: 1, unit: "%" },
-          { key: "memory", label: this._t("label.ram"), decimals: 0, unit: "%" },
-          { key: "temperature", label: this._t("label.temp"), decimals: 1, unit: "°C" }
-        ].forEach((def, index) => {
-          if (index > 0) {
-            const separator = document.createElement("span");
-            separator.textContent = "·";
-            summaryRow1.append(separator);
-          }
-
-          const el = document.createElement("span");
-          this._makeClickable(el, this._config[def.key]);
-          summaryRow1.append(el);
-          this._summaryItems.push({ el, ...def });
-        });
+        this._summaryItems = this._createSystemSummary(summaryRow1);
 
         const summaryRow2 = document.createElement("div");
         summaryRow2.className = "summary-row";
@@ -119,10 +103,7 @@
         this._setBadge(this._status, trackerStatus.type, trackerStatus.label);
 
         // Rij 1: CPU, RAM en Temperatuur
-        this._summaryItems.forEach(({ el, key, label, decimals, unit }) => {
-          el.textContent =
-            `${label} ${this._formatSensor(this._config[key], decimals, unit)}`;
-        });
+        this._updateSystemSummary();
 
         // Rij 2: Opslagberekening (Gebruikt / Totaal)
         const usedVal = this._getNumber(this._config.storage_used);
