@@ -123,5 +123,6 @@
   "rows.decrease_temperature": "Decrease temperature",
   "rows.increase_temperature": "Increase temperature",
   "rows.cancel": "Cancel",
-  "rows.confirm": "Confirm"
+  "rows.confirm": "Confirm",
+  "error.rows_value_order": "Entry {index}: value_order must be a list of unique values: temperature, humidity, illuminance, pressure or power."
 }

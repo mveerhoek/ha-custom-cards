@@ -123,5 +123,6 @@
   "rows.decrease_temperature": "Temperatuur verlagen",
   "rows.increase_temperature": "Temperatuur verhogen",
   "rows.cancel": "Annuleren",
-  "rows.confirm": "Bevestigen"
+  "rows.confirm": "Bevestigen",
+  "error.rows_value_order": "Regel {index}: value_order moet een lijst met unieke waarden zijn: temperature, humidity, illuminance, pressure of power."
 }
