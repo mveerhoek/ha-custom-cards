@@ -304,6 +304,7 @@ the end of the summary; clicking a displayed value opens its entity details.
 | `name`, `icon` | Yes | Display name and Material Design icon, e.g. `mdi:sofa` |
 | `switch` | No | Switch or light toggled by clicking the entry icon |
 | `temperature`, `humidity`, `illuminance`, `pressure`, `power` | No | Sensor entities shown in that order |
+| `value_order` | No | Order of sensor values for this entry; omitted values follow in the default order |
 | `door` | No | Binary sensor: on/off displays an open/closed door badge |
 | `extras` | No | List of expandable controls |
 
@@ -314,7 +315,10 @@ entity name and icon. Supported types:
   mute and album artwork when available.
 - `climate`: shows status and target temperature with plus/minus buttons;
   `step` sets the increment (default `0.5`). Long-press the extra to turn it on
-  or off. A heating or cooling badge may appear on the entry icon.
+  or off. A light-blue circle grows while pressing and briefly lights up when
+  the action is triggered after 0.5 seconds. Releasing early, moving or
+  scrolling cancels it; buttons do not trigger the long press. A heating or
+  cooling badge may appear on the entry icon.
 - `power_switch`: shows the switch state, optionally a `power` sensor and
   `status` binary sensor. Set `switchable: true` to enable control. Turning off
   a switch while its `status` sensor is on requires an inline confirmation;
@@ -328,6 +332,7 @@ entries:
     switch: light.living_room
     temperature: sensor.living_room_temperature
     humidity: sensor.living_room_humidity
+    value_order: [humidity, temperature]
     door: binary_sensor.living_room_door
     extras:
       - type: media_player
@@ -341,6 +346,11 @@ entries:
         status: binary_sensor.television_active
         switchable: true
 ```
+
+`value_order` is set per entry and accepts `temperature`, `humidity`,
+`illuminance`, `pressure` and `power` once each. Leave it out for the default
+order shown above. A partial list puts those values first and appends the other
+configured values in default order. Unconfigured sensors are not displayed.
 
 The card also supports `css_url` for an alternative shared stylesheet.
 
