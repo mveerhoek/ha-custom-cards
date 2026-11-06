@@ -492,6 +492,7 @@
         let startY = 0;
         let fadeTimer = null;
         let completedIndicator = null;
+        let startedAt = 0;
 
         const cancel = () => {
           clearTimeout(timer);
@@ -511,6 +512,9 @@
           indicator = document.createElement("span");
           indicator.className = "long-press-indicator";
           indicator.setAttribute("aria-hidden", "true");
+          // Bij touch bedekt de vinger de cirkel; die krijgt daarom een grotere uitvoering (zie CSS)
+          indicator.dataset.pointer = event.pointerType || "mouse";
+          startedAt = Date.now();
           indicator.style.left = `${event.clientX - bounds.left}px`;
           indicator.style.top = `${event.clientY - bounds.top}px`;
           indicator.style.animationDuration = `${delay}ms`;
@@ -535,7 +539,17 @@
           if (timer && event.pointerId === pointerId && Math.hypot(event.clientX - startX, event.clientY - startY) > 10) cancel();
         });
         ["pointerup", "pointercancel", "pointerleave"].forEach((type) =>
-          element.addEventListener(type, (event) => { if (event.pointerId === pointerId) cancel(); })
+          element.addEventListener(type, (event) => {
+            if (event.pointerId !== pointerId) return;
+
+            // De companion app (Android WebView) stuurt rond de houdtijd zelf een pointercancel
+            // omdat het systeem een lange druk herkent. Zonder beweging is dat geen echte
+            // onderbreking: laat de timer dan gewoon aflopen.
+            if (type === "pointercancel" && event.pointerType !== "mouse" &&
+                Date.now() - startedAt >= delay - 150) return;
+
+            cancel();
+          })
         );
         element.addEventListener("contextmenu", (event) => event.preventDefault());
         return () => { cancel(); clearTimeout(fadeTimer); completedIndicator?.remove(); };

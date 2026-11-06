@@ -931,6 +931,7 @@ ha-card {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* De cirkel groeit gedurende de houdtijd en licht kort op bij uitvoering. */
@@ -954,6 +955,23 @@ ha-card {
 }
 @keyframes long-press-grow {
   to { transform: translate(-50%, -50%) scale(3); }
+}
+
+/* Touch (o.a. de companion app): een vinger bedekt de kleine cirkel volledig, en de rij is
+   maar enkele tientallen pixels hoog. Daarom groeit de cirkel hier veel verder, zodat hij
+   links en rechts van de vinger duidelijk zichtbaar uitloopt. */
+.long-press-indicator[data-pointer="touch"],
+.long-press-indicator[data-pointer="pen"] {
+  animation-name: long-press-grow-touch;
+  background: rgba(100, 190, 255, 0.28);
+  border-width: 3px;
+}
+.long-press-indicator[data-pointer="touch"].complete,
+.long-press-indicator[data-pointer="pen"].complete {
+  background: rgba(100, 190, 255, 0.6);
+}
+@keyframes long-press-grow-touch {
+  to { transform: translate(-50%, -50%) scale(14); }
 }
 
 /* Ronde icoonknop (lichtgrijze cirkel, bij hover een accenttint) */
