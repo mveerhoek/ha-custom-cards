@@ -96,29 +96,32 @@
 
     class CustomRowsCard extends CardBase {
       setConfig(config) {
+        this._configError = null;
         if (!Array.isArray(config.entries) || !config.entries.length) {
-          throw new Error("Set a list of entries using the entries option.");
+          return this._invalidConfig("error.rows_entries");
         }
 
-        const entries = config.entries.map((entry, index) => {
+        let entries;
+        try {
+        entries = config.entries.map((entry, index) => {
           if (!entry || !entry.name) {
-            throw new Error(`Entry ${index + 1}: set a name using the name option.`);
+            throw { key: "error.rows_name", params: { index: index + 1 } };
           }
           if (!entry.icon) {
-            throw new Error(`Entry ${index + 1}: set an icon using the icon option.`);
+            throw { key: "error.rows_icon", params: { index: index + 1 } };
           }
           if (entry.extras !== undefined && !Array.isArray(entry.extras)) {
-            throw new Error(`Entry ${index + 1}: extras must be a list.`);
+            throw { key: "error.rows_extras", params: { index: index + 1 } };
           }
 
           const extras = (entry.extras || []).map((extra, extraIndex) => {
-            const where = `Entry ${index + 1}, extra ${extraIndex + 1}`;
+            const params = { index: index + 1, extra: extraIndex + 1 };
 
             if (!extra || !EXTRA_TYPES.includes(extra.type)) {
-              throw new Error(`${where}: set type to ${EXTRA_TYPES.join(" or ")}.`);
+              throw { key: "error.rows_extra_type", params };
             }
             if (!extra.entity) {
-              throw new Error(`${where}: set an entity using the entity option.`);
+              throw { key: "error.rows_extra_entity", params };
             }
 
             return {
@@ -147,6 +150,10 @@
           };
         });
 
+        } catch (error) {
+          if (!error.key) throw error;
+          return this._invalidConfig(error.key, error.params);
+        }
         this._config = {
           css_url: config.css_url, // optioneel: pad naar de gedeelde stylesheet
           entries
@@ -652,6 +659,12 @@
           status.textContent = bottom;
           status.title = bottom;
 
+          info.el.setAttribute("aria-label", this._t("rows.more_info", { name: top }));
+          play.el.setAttribute("aria-label", this._t(state?.state === "playing" ? "rows.pause" : "rows.play"));
+          volume.el.setAttribute("aria-label", this._t("rows.volume"));
+          mute.el.setAttribute("aria-label", this._t(attrs.is_volume_muted ? "rows.unmute" : "rows.mute"));
+          slider.setAttribute("aria-label", this._t("rows.volume"));
+          cancel.el.setAttribute("aria-label", this._t("rows.close"));
           play.setIcon(state?.state === "playing" ? "mdi:pause" : "mdi:play");
           play.el.disabled = !active;
 
@@ -775,6 +788,9 @@
           name.textContent = extra.name || attrs.friendly_name || extra.entity;
           status.textContent = state ? this._stateText(state) : "—";
 
+          info.el.setAttribute("aria-label", this._t("rows.more_info", { name: name.textContent }));
+          minus.el.setAttribute("aria-label", this._t("rows.decrease_temperature"));
+          plus.el.setAttribute("aria-label", this._t("rows.increase_temperature"));
           info.setIcon(extra.icon || CLIMATE_ICONS[state?.state] || "mdi:thermostat");
 
           // Kleur volgens wat het toestel nu doet (hvac_action, anders de ingestelde modus)
@@ -930,9 +946,10 @@
           name.textContent = text;
           name.title = text;
 
-          const nl = String(this._language || "").toLowerCase().startsWith("nl");
-          const question = nl ? `${text} uitschakelen?` : `Turn off ${text}?`;
+          const question = this._t("rows.confirm_off", { name: text });
 
+          confirmNo.el.setAttribute("aria-label", this._t("rows.cancel"));
+          confirmYes.el.setAttribute("aria-label", this._t("rows.confirm"));
           confirmText.textContent = question;
           confirmText.title = question;
 
