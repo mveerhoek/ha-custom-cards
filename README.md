@@ -15,6 +15,7 @@ functionality.
 | **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices |
 | **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks |
 | **Custom Desktop Card** | Desktop computer status and performance |
+| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project |
 
 ## Installation
@@ -22,7 +23,10 @@ functionality.
 1.  Open **HACS** in Home Assistant.
 2.  Add this repository via **Custom repositories**.
 3.  Select **Dashboard** as the category.
-4.  Install the repository.
+4.  Install the repository. Ensure the dashboard resource points to
+    `/hacsfiles/ha-custom-cards/ha-custom-cards.js` as a JavaScript module
+    (adjust the path if your repository has a different HACS name). Keep the
+    other files and translation directory next to it.
 5.  Add the card to your dashboard using the visual editor or YAML
     configuration.
 
@@ -41,6 +45,10 @@ ha-custom-cards/
     ├── custom-network-infrastructure-card.js
     ├── synology-nas-card.js
     ├── custom-desktop-card.js
+    ├── custom-rows-card.js
+    ├── custom-cards-translations/
+    │   ├── en.json
+    │   └── nl.json
     └── docker-combined-card.js
 ```
 
@@ -285,10 +293,64 @@ The status is determined using the `device_tracker` entity:
 
 ------------------------------------------------------------------------
 
-## 4. Docker Combined Card
+## 4. Custom Rows Card
+
+Displays one or two columns of entries, depending on the card width. An
+expanded entry spans the full width. Values that do not fit are hidden from
+the end of the summary; clicking a displayed value opens its entity details.
+
+| Entry option | Required | Description |
+| :--- | :--- | :--- |
+| `name`, `icon` | Yes | Display name and Material Design icon, e.g. `mdi:sofa` |
+| `switch` | No | Switch or light toggled by clicking the entry icon |
+| `temperature`, `humidity`, `illuminance`, `pressure`, `power` | No | Sensor entities shown in that order |
+| `door` | No | Binary sensor: on/off displays an open/closed door badge |
+| `extras` | No | List of expandable controls |
+
+Each extra requires `type` and `entity`. `name` and `icon` override the
+entity name and icon. Supported types:
+
+- `media_player`: opens more-info from the icon; includes play/pause, volume,
+  mute and album artwork when available.
+- `climate`: shows status and target temperature with plus/minus buttons;
+  `step` sets the increment (default `0.5`). Long-press the extra to turn it on
+  or off. A heating or cooling badge may appear on the entry icon.
+- `power_switch`: shows the switch state, optionally a `power` sensor and
+  `status` binary sensor. Set `switchable: true` to enable control. Turning off
+  a switch while its `status` sensor is on requires an inline confirmation;
+  the prompt closes after five seconds.
+
+```yaml
+type: custom:custom-rows-card
+entries:
+  - name: Living room
+    icon: mdi:sofa
+    switch: light.living_room
+    temperature: sensor.living_room_temperature
+    humidity: sensor.living_room_humidity
+    door: binary_sensor.living_room_door
+    extras:
+      - type: media_player
+        entity: media_player.living_room
+      - type: climate
+        entity: climate.living_room
+        step: 0.5
+      - type: power_switch
+        entity: switch.television_power
+        power: sensor.television_power
+        status: binary_sensor.television_active
+        switchable: true
+```
+
+The card also supports `css_url` for an alternative shared stylesheet.
+
+------------------------------------------------------------------------
+
+## 5. Docker Combined Card
 
 Displays Docker containers grouped by project, including CPU, memory and
-network usage.
+network usage. Overview totals include running containers only; unavailable
+values contribute zero to totals.
 
 The card automatically discovers containers based on their switch
 entities. Containers that are not assigned to a configured project are
@@ -361,6 +423,16 @@ collapsed. Containers can be started and stopped directly from the card.
 Confirmation is requested by default.
 
 ------------------------------------------------------------------------
+
+## Translations
+
+The interface follows the language configured in Home Assistant. English and
+Dutch are included in `dist/custom-cards-translations/`. English is the fallback
+for missing files and keys; a regional language file overrides its base language,
+which overrides English. Add a `<language>.json` file in that directory to add a
+language. Preserve keys, placeholders such as `{name}` and plural suffixes such
+as `_one` and `_other`. Configured names, entity values and custom confirmation
+messages remain as supplied by the user or Home Assistant.
 
 ## General information
 

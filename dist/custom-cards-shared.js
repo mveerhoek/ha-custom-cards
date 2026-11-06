@@ -78,6 +78,7 @@
       if (language === this._language) return;
 
       this._language = language;
+      updateCatalog(language);
 
       loadStrings(language).then((strings) => {
         if (this._language !== language) return;
@@ -127,12 +128,25 @@
       this._ensureLanguage();
 
       // Pas bijwerken zodra de teksten geladen zijn
-      if (this._strings) this._update();
+      if (this._strings && !this._configError) this._update();
     }
 
     // Teksten zijn (opnieuw) geladen: de kaart wordt opnieuw opgebouwd
     _onStringsLoaded() {
-      this._build();
+      if (this._configError) this._showConfigError();
+      else this._build();
+    }
+    _invalidConfig(key, params = {}) {
+      this._config = null;
+      this._configError = { key, params };
+      if (this._strings) this._showConfigError();
+    }
+    _showConfigError() {
+      if (!this.shadowRoot) this.attachShadow({ mode: "open" });
+      const card = document.createElement("ha-card");
+      card.style.padding = "16px";
+      card.textContent = this._t(this._configError.key, this._configError.params);
+      this.shadowRoot.replaceChildren(card);
     }
 
     // Eerste stap van _build(): false als er nog geen configuratie is
@@ -456,6 +470,20 @@
   // Met editor ({ schema }) krijgt de kaart ook een visuele editor; id is de naam waaronder
   // de teksten van de editor in de vertaalbestanden staan; stubConfig is de
   // startconfiguratie bij het toevoegen van de kaart.
+  const catalog = new Map();
+  let catalogLanguage = FALLBACK_LANGUAGE;
+  let catalogStrings = {};
+  const updateCatalog = (language) => {
+    catalogLanguage = language;
+    loadStrings(language).then((strings) => {
+      if (catalogLanguage !== language) return;
+      catalogStrings = strings;
+      for (const [id, item] of catalog) {
+        item.name = strings[`card.${id}.name`] || item.name;
+        item.description = strings[`card.${id}.description`] || item.description;
+      }
+    });
+  };
   const registerCard = (tag, cardClass, { id, name, description, editor, stubConfig }) => {
     if (!customElements.get(tag)) {
       customElements.define(tag, cardClass);
@@ -478,11 +506,20 @@
     }
 
     if (stubConfig) {
-      cardClass.getStubConfig = () => JSON.parse(JSON.stringify(stubConfig));
+      cardClass.getStubConfig = () => {
+        const config = JSON.parse(JSON.stringify(stubConfig));
+        if (config.name) config.name = catalogStrings[`card.${id}.default_name`] || config.name;
+        if (id === "rows" && config.entries?.[0]) config.entries[0].name = catalogStrings["card.rows.default_name"] || config.entries[0].name;
+        return config;
+      };
     }
 
     window.customCards = window.customCards || [];
-    window.customCards.push({ type: tag, name, description });
+    const item = { type: tag, name, description };
+    window.customCards.push(item);
+    catalog.set(id, item);
+    const hass = document.querySelector("home-assistant")?.hass;
+    updateCatalog(hass?.locale?.language || hass?.language || catalogLanguage);
   };
 
   window.CustomCardsShared = { CardBase, CardEditorBase, registerCard };
