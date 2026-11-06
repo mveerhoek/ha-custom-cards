@@ -32,6 +32,10 @@
           projects
         };
 
+        this._configuredContainers = new Set(projects.flatMap((project) => project.containers));
+        this._containerCache = null;
+        this._containerStates = null;
+
         // Opgeklapt/uitgeklapt per niveau
         this._expanded = false;
         this._expandedProjects = {};
@@ -296,13 +300,29 @@
       // Alle containers automatisch ontdekken via de switch-prefix
       _getContainers() {
         if (!this._hass) return [];
+        if (this._containerStates === this._hass.states && this._containerCache) return this._containerCache;
+        this._containerStates = this._hass.states;
+        const prefix = `switch.${this._config.entity_prefix}`;
+        const names = Object.keys(this._hass.states).filter((id) => id.startsWith(prefix))
+          .map((id) => id.substring(prefix.length));
+        const cached = this._containerCache;
+        if (!cached || names.length !== cached.length || names.some((name) => !this._containerSet.has(name))) {
+          this._containerCache = names.sort((a, b) => a.localeCompare(b));
+          this._containerSet = new Set(names);
+        }
+        return this._containerCache;
+      }
 
-        const switchPrefix = `switch.${this._config.entity_prefix}`;
-
-        return Object.keys(this._hass.states)
-          .filter(entityId => entityId.startsWith(switchPrefix))
-          .map(entityId => entityId.substring(switchPrefix.length))
-          .sort((a, b) => a.localeCompare(b));
+      _observedEntityIds() {
+        const ids = super._observedEntityIds();
+        const prefix = this._config.entity_prefix;
+        for (const name of new Set([...this._getContainers(), ...this._configuredContainers])) {
+          ids.add(`switch.${prefix}${name}`);
+          for (const suffix of ["cpu", "memory_usage", "network_rx", "network_tx"]) {
+            ids.add(`sensor.${prefix}${name}_${suffix}`);
+          }
+        }
+        return ids;
       }
 
       // Numerieke waarde; 0 bij onbekend/niet beschikbaar (voor totalen)
@@ -333,10 +353,7 @@
         const discovered = this._getContainers();
 
         // Containers die in geen enkel project zitten -> virtueel project "Other"
-        const configured = new Set(
-          this._config.projects.flatMap(project => project.containers)
-        );
-        const otherNames = discovered.filter(name => !configured.has(name));
+        const otherNames = discovered.filter(name => !this._configuredContainers.has(name));
         const otherKey = otherNames.join("|");
 
         if (otherKey !== this._otherKey) {
