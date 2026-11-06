@@ -1113,12 +1113,15 @@
 
           if (icon.icon !== (extra.icon || "mdi:lightbulb")) icon.icon = extra.icon || "mdi:lightbulb";
 
-          // Aan: kleur van de lamp (rgb_color); is die er niet, dan blijft het oranje
+          // Uit: grijs (CSS). Aan: kleur van de lamp (rgb_color); heeft de entiteit die niet
+          // (bijv. een switch), dan oranje.
           const rgb = state?.attributes?.rgb_color;
           const hasColor = isOn && Array.isArray(rgb) && rgb.length === 3 &&
             rgb.every((part) => Number.isFinite(Number(part)));
 
-          iconWrap.style.color = hasColor ? `rgb(${rgb.map((part) => Math.round(Number(part))).join(", ")})` : "";
+          iconWrap.style.color = hasColor
+            ? `rgb(${rgb.map((part) => Math.round(Number(part))).join(", ")})`
+            : isOn ? "var(--cc-switch-color)" : "";
 
           const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
 

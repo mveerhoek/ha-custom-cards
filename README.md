@@ -336,7 +336,8 @@ entity name and icon. Supported types:
 - `light`: controls a light. A compact row with the icon (`mdi:lightbulb`,
   overridable with `icon`), the name (overridable with `name`) and a toggle on
   the right. When the light is on, the icon takes the colour of the light
-  (`rgb_color`); if the light has no colour, or is off, the icon is orange. The
+  (`rgb_color`), or orange if it has no colour (e.g. a `switch` entity); when off
+  the icon is grey. The
   toggle shows `mdi:toggle-switch-variant` in green when on and
   `mdi:toggle-switch-variant-off` in grey when off. Clicking it switches the light.
 
