@@ -114,6 +114,14 @@
             throw { key: "error.rows_extras", params: { index: index + 1 } };
           }
 
+          if (entry.value_order !== undefined && (
+            !Array.isArray(entry.value_order) ||
+            entry.value_order.some((key) => !VALUES.some((def) => def.key === key)) ||
+            new Set(entry.value_order).size !== entry.value_order.length
+          )) {
+            throw { key: "error.rows_value_order", params: { index: index + 1 } };
+          }
+
           const extras = (entry.extras || []).map((extra, extraIndex) => {
             const params = { index: index + 1, extra: extraIndex + 1 };
 
@@ -145,6 +153,7 @@
             illuminance: entry.illuminance,
             pressure: entry.pressure,
             power: entry.power,
+            value_order: entry.value_order,
             door: entry.door, // optioneel: binary_sensor van een deur (alleen als badge)
             extras
           };
@@ -234,7 +243,11 @@
           // Tweede regel: alleen de geconfigureerde waarden, gescheiden door een punt
           const values = [];
           let summaryRowEl = null;
-          const defs = VALUES.filter((def) => entry[def.key]);
+          // Een gedeeltelijke volgorde krijgt de overige waarden in standaardvolgorde erachter.
+          const order = [...(entry.value_order || []), ...VALUES.map((def) => def.key)];
+          const defs = [...new Set(order)]
+            .map((key) => VALUES.find((def) => def.key === key))
+            .filter((def) => entry[def.key]);
 
           if (defs.length) {
             const summary = document.createElement("div");
@@ -457,39 +470,54 @@
 
       // Lang indrukken (standaard een halve seconde). Knoppen en de slider in het element
       // doen niet mee; bij bewegen (scrollen) of loslaten vooraf wordt het afgebroken.
-      _onLongPress(element, handler, { delay = 500 } = {}) {
+      _onLongPress(element, handler, { delay = 500, canStart = () => true } = {}) {
         let timer = null;
+        let indicator = null;
+        let pointerId = null;
         let startX = 0;
         let startY = 0;
 
         const cancel = () => {
           clearTimeout(timer);
           timer = null;
+          pointerId = null;
+          indicator?.remove();
+          indicator = null;
         };
 
         element.addEventListener("pointerdown", (event) => {
-          if (event.button !== 0 || event.target.closest("button, input")) return;
-
+          if (event.button !== 0 || !event.isPrimary || event.target.closest("button, input") || !canStart()) return;
           cancel();
+          pointerId = event.pointerId;
           startX = event.clientX;
           startY = event.clientY;
+          const bounds = element.getBoundingClientRect();
+          indicator = document.createElement("span");
+          indicator.className = "long-press-indicator";
+          indicator.setAttribute("aria-hidden", "true");
+          indicator.style.left = `${event.clientX - bounds.left}px`;
+          indicator.style.top = `${event.clientY - bounds.top}px`;
+          indicator.style.animationDuration = `${delay}ms`;
+          element.append(indicator);
 
           timer = setTimeout(() => {
             timer = null;
+            pointerId = null;
+            const completed = indicator;
+            indicator = null;
+            completed?.classList.add("complete");
+            setTimeout(() => completed?.remove(), 300);
             navigator.vibrate?.(30);
             handler();
           }, delay);
         });
 
         element.addEventListener("pointermove", (event) => {
-          if (timer && Math.hypot(event.clientX - startX, event.clientY - startY) > 10) cancel();
+          if (timer && event.pointerId === pointerId && Math.hypot(event.clientX - startX, event.clientY - startY) > 10) cancel();
         });
-
         ["pointerup", "pointercancel", "pointerleave"].forEach((type) =>
-          element.addEventListener(type, cancel)
+          element.addEventListener(type, (event) => { if (event.pointerId === pointerId) cancel(); })
         );
-
-        // Voorkomt het contextmenu dat een lange druk op touchscreens kan openen
         element.addEventListener("contextmenu", (event) => event.preventDefault());
       }
 
@@ -736,7 +764,7 @@
           this._callService("climate", state.state === "off" ? "turn_on" : "turn_off", {
             entity_id: extra.entity
           });
-        });
+        }, { canStart: () => isAvailable(this._getState(extra.entity)) });
 
         // Snel achter elkaar klikken: de gekozen waarde wordt direct getoond en na een
         // korte pauze in één keer doorgegeven aan Home Assistant.
