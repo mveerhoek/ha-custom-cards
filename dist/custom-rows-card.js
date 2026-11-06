@@ -17,7 +17,7 @@
     const COLUMN_GAP = 20; // px
 
     // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover"];
+    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light"];
     const DEFAULT_STEP = 0.5; // °C per klik bij een climate
 
     const MEDIA_ICONS = {
@@ -317,6 +317,7 @@
               if (extra.type === "climate") return this._buildClimate(extra);
               if (extra.type === "power_switch") return this._buildPowerSwitch(extra);
               if (extra.type === "cover") return this._buildCover(extra);
+              if (extra.type === "light") return this._buildLight(extra);
               return this._buildMedia(extra);
             });
             extrasEl.append(...extras.map((extra) => extra.el));
@@ -1059,6 +1060,80 @@
         return { el, update, dispose };
       }
 
+      // ----- Extra element: lichtbron -----
+
+      // Compacte rij: icoon (kleur van de lamp) | naam (dik) | schakelaar
+      _buildLight(extra) {
+        const el = document.createElement("div");
+        el.className = "extra extra-power extra-light";
+
+        const view = document.createElement("div");
+        view.className = "extra-view";
+
+        // Icoon: de kleur van de lamp zodra die aan is, anders oranje (zie CSS)
+        const iconWrap = document.createElement("div");
+        iconWrap.className = "power-icon light-icon";
+
+        const icon = document.createElement("ha-icon");
+        icon.icon = extra.icon || "mdi:lightbulb";
+        iconWrap.append(icon);
+
+        const labels = document.createElement("div");
+        labels.className = "extra-labels";
+
+        const name = document.createElement("div");
+        name.className = "entry-name";
+        labels.append(name);
+
+        const right = document.createElement("div");
+        right.className = "extra-right";
+
+        // Schakelaar: groen als aan, grijs als uit
+        const toggle = document.createElement("span");
+        toggle.className = "power-toggle switchable";
+        toggle.setAttribute("role", "switch");
+        toggle.setAttribute("tabindex", "0");
+
+        const toggleIcon = document.createElement("ha-icon");
+        toggle.append(toggleIcon);
+
+        this._onActivate(toggle, () => this._toggle(extra.entity), { stopPropagation: true });
+
+        right.append(toggle);
+        view.append(iconWrap, labels, right);
+        el.append(view);
+
+        const update = () => {
+          const state = this._getState(extra.entity);
+          const isOn = state?.state === "on";
+          const text = extra.name || state?.attributes?.friendly_name || extra.entity;
+
+          name.textContent = text;
+          name.title = text;
+
+          if (icon.icon !== (extra.icon || "mdi:lightbulb")) icon.icon = extra.icon || "mdi:lightbulb";
+
+          // Aan: kleur van de lamp (rgb_color); is die er niet, dan blijft het oranje
+          const rgb = state?.attributes?.rgb_color;
+          const hasColor = isOn && Array.isArray(rgb) && rgb.length === 3 &&
+            rgb.every((part) => Number.isFinite(Number(part)));
+
+          iconWrap.style.color = hasColor ? `rgb(${rgb.map((part) => Math.round(Number(part))).join(", ")})` : "";
+
+          const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
+
+          if (toggleIcon.icon !== toggleName) toggleIcon.icon = toggleName;
+
+          toggle.classList.toggle("on", isOn);
+          toggle.classList.toggle("unavailable", !state || state.state === "unavailable");
+          toggle.title = state ? this._stateText(state) : "—";
+          toggle.setAttribute("aria-checked", String(isOn));
+          toggle.setAttribute("aria-label", text);
+        };
+
+        return { el, update };
+      }
+
       // ----- Extra element: stroomschakelaar -----
 
       // Compacte rij: icoon | naam (dik) | vermogen | status binary sensor | schakelaar
@@ -1311,7 +1386,7 @@
     registerCard("custom-rows-card", CustomRowsCard, {
       id: "rows",
       name: "Custom Rows Card",
-      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / power switch elements.",
+      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch elements.",
       editor: {
         schema: [
           { name: "entries", selector: { object: {} } },

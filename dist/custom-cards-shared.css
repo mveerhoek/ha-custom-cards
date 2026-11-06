@@ -885,6 +885,12 @@ ha-card {
 }
 
 /* Schakelaar: grijs uit, groen aan; alleen klikbaar met .switchable */
+/* Lichtbron: het icoon is oranje; is de lamp aan en kent hij een kleur, dan zet de kaart die
+   kleur inline op dit element */
+.power-icon.light-icon {
+  color: var(--secondary-text-color);
+}
+
 .power-toggle {
   display: inline-flex;
   align-items: center;
