@@ -15,7 +15,7 @@ functionality.
 | **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices |
 | **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks |
 | **Custom Desktop Card** | Desktop computer status and performance |
-| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls |
+| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover) |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project |
 
 ## Installation
@@ -323,6 +323,16 @@ entity name and icon. Supported types:
   `status` binary sensor. Set `switchable: true` to enable control. Turning off
   a switch while its `status` sensor is on requires an inline confirmation;
   the prompt closes after five seconds.
+- `cover`: controls a cover (e.g. sunscreen or blinds). The button on the left
+  (`mdi:window-open`) toggles between open and closed. Next to it the name is
+  shown in bold, with the state and, when the cover reports a position, how far
+  it is open (e.g. `Open · 40%`) below it. On the right are buttons to close
+  (`mdi:arrow-down`), open (`mdi:arrow-up`) and to switch the row to a slider
+  (`mdi:gesture-swipe-horizontal`). The slider spans the full row and sets the
+  percentage the cover is open; the button on its right
+  (`mdi:gesture-tap-button`) returns to the normal row. The slider requires a
+  cover that reports `current_position`. The close and open buttons are
+  disabled while the cover is already fully closed or open.
 
 ```yaml
 type: custom:custom-rows-card
@@ -345,6 +355,9 @@ entries:
         power: sensor.television_power
         status: binary_sensor.television_active
         switchable: true
+      - type: cover
+        entity: cover.living_room_sunscreen
+        name: Sunscreen
 ```
 
 `value_order` is set per entry and accepts `temperature`, `humidity`,
