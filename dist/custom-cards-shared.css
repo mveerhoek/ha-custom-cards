@@ -869,6 +869,39 @@ ha-card {
   font-variant-numeric: tabular-nums;
 }
 
+/* Temperaturen (temperatures): thermometer links, rechts per sensor een nummericoon en de waarde.
+   Past het niet op één regel, dan lopen de sensoren door op een volgende regel (rechts uitgelijnd). */
+.extra-temperatures .extra-view {
+  align-items: flex-start;
+}
+
+.extra-temperatures .power-icon {
+  height: 24px;
+}
+
+.extra-temperatures .extra-right {
+  flex: 1 1 0;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 12px;
+}
+
+.temperature-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  color: var(--secondary-text-color);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.temperature-item ha-icon {
+  --mdc-icon-size: 18px;
+}
+
 /* Binary sensor: grijs, light green als hij aan staat */
 .extra-state-icon {
   display: inline-flex;
