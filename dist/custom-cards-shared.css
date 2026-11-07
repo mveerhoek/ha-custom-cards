@@ -480,7 +480,7 @@ ha-card {
 /* Kop: ruimer hovervlak, de inhoud blijft op zijn plek */
 :host(docker-combined-card) .header {
   padding: 4px 6px;
-  margin: -4px -6px 8px;
+  margin: -4px -6px 0;
   border-radius: 6px;
   cursor: pointer;
 }
@@ -490,34 +490,6 @@ ha-card {
   outline: 2px solid var(--primary-color);
   outline-offset: 3px;
   border-radius: 6px;
-}
-
-:host(docker-combined-card) .divider {
-  margin-bottom: 10px;
-}
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.metric {
-  min-width: 0;
-}
-
-.metric-label {
-  color: var(--secondary-text-color);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.metric-value {
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 24px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* Projectenlijst */
