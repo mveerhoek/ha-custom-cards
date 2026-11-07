@@ -870,8 +870,8 @@ ha-card {
 }
 
 /* Verbruik (consumption) deelt deze opmaak.
-   Sensoren (sensors): icoon links, rechts per entiteit een icoon (standaard nummericoon), een
-   optioneel vet label en de waarde.
+   Sensoren (sensors): icoon links, daarnaast een optioneel vet label van de rij, rechts per
+   entiteit een icoon (standaard nummericoon), een optioneel label en de waarde.
    Past het niet op één regel, dan lopen de sensoren door op een volgende regel (rechts uitgelijnd). */
 .extra-sensors .extra-view,
 .extra-consumption .extra-view {
@@ -909,9 +909,15 @@ ha-card {
   --mdc-icon-size: 18px;
 }
 
-/* Optioneel label van een sensors-item: vet, rechts van het icoon en links van de waarde */
+/* Optioneel label van de rij: vet, rechts van het hoofdicoon (opmaak: .entry-name) */
+.extra-sensors .entry-name {
+  flex: 0 1 auto;
+  line-height: 24px;
+}
+
+/* Optioneel label van een sensors-item: normaal, rechts van het icoon en links van de waarde */
 .sensor-label {
-  font-weight: 700;
+  font-weight: 400;
   margin-right: 2px;
 }
 
