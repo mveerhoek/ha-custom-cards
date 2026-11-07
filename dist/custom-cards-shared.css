@@ -869,17 +869,21 @@ ha-card {
   font-variant-numeric: tabular-nums;
 }
 
-/* Temperaturen (temperatures): thermometer links, rechts per sensor een nummericoon en de waarde.
+/* Verbruik (consumption) deelt deze opmaak.
+   Temperaturen (temperatures): thermometer links, rechts per sensor een nummericoon en de waarde.
    Past het niet op één regel, dan lopen de sensoren door op een volgende regel (rechts uitgelijnd). */
-.extra-temperatures .extra-view {
+.extra-temperatures .extra-view,
+.extra-consumption .extra-view {
   align-items: flex-start;
 }
 
-.extra-temperatures .power-icon {
+.extra-temperatures .power-icon,
+.extra-consumption .power-icon {
   height: 24px;
 }
 
-.extra-temperatures .extra-right {
+.extra-temperatures .extra-right,
+.extra-consumption .extra-right {
   flex: 1 1 0;
   min-width: 0;
   flex-wrap: wrap;
@@ -887,7 +891,8 @@ ha-card {
   gap: 4px 12px;
 }
 
-.temperature-item {
+.temperature-item,
+.consumption-item {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -898,7 +903,8 @@ ha-card {
   font-variant-numeric: tabular-nums;
 }
 
-.temperature-item ha-icon {
+.temperature-item ha-icon,
+.consumption-item ha-icon {
   --mdc-icon-size: 18px;
 }
 
