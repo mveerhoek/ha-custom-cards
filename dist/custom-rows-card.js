@@ -246,7 +246,10 @@
         if (this._disposed) {
           this._disposed = false;
           this._build();
-        } else if (this._observer && this._grid) this._observer.observe(this._grid);
+        } else if (this._observer && this._grid) {
+          this._observer.observe(this._grid);
+          this._observeBands();
+        }
       }
 
       disconnectedCallback() {
@@ -256,6 +259,9 @@
 
       _disposeControls() {
         this._observer?.disconnect();
+        this._bandObserver?.disconnect();
+        cancelAnimationFrame(this._bandRefit);
+        this._bandRefit = null;
         (this._rows || []).forEach((row) => row.extras.forEach((extra) => extra.dispose?.()));
       }
 
@@ -421,55 +427,177 @@
         this._update();
       }
 
-      // Plaatst de regels in het raster, met een scheidingslijn na iedere volle rij.
-      // Een uitgeklapte regel beslaat bij 1 of 2 kolommen de volle breedte; bij 4 kolommen de
-      // meest linker of de meest rechter twee kolommen. Staat de regel op een oneven kolom, dan
-      // schuift hij door naar de volgende twee kolommen (links of rechts), zodat er hooguit één
-      // kolom leeg blijft; past hij niet meer in de rij, dan begint hij op een nieuwe rij links.
+      // Plaatst de regels in het raster, met een scheidingslijn tussen de rijen.
+      // Bij 1 of 2 kolommen beslaat een uitgeklapte regel een eigen rij over de volle breedte.
+      // Bij 4 kolommen beslaat hij de meest linker of de meest rechter twee kolommen ("band"):
+      // de twee andere kolommen worden gevuld met de regels uit de lijst (eerst de regels die al
+      // in de rij stonden, daarna de volgende), net zoveel als er naast de uitgeklapte regel passen.
+      // De volgorde verandert dus alleen zolang een regel uitgeklapt is.
       _applyLayout(columns) {
         this._columns = columns;
         this._grid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+        this._grid.replaceChildren();
+        this._bandHeights = new Map(); // uitgeklapt element -> hoogte waarmee de band is opgebouwd
 
-        const children = [];
-        const lastIndex = this._rows.length - 1;
-        const span = columns === 4 ? 2 : columns; // breedte (in kolommen) van een uitgeklapte regel
-        let column = 0; // aantal gevulde kolommen in de huidige rij
+        const rows = this._rows;
+        const last = rows.length - 1;
+        const isOpen = (index) => !!rows[index].extrasEl && this._expanded.has(index);
 
-        const addDivider = () => {
+        const makeDivider = () => {
           const divider = document.createElement("div");
           divider.className = "divider";
-          children.push(divider);
+          return divider;
         };
 
-        this._rows.forEach((row, index) => {
-          const open = !!row.extrasEl && this._expanded.has(index);
+        // Rijen van `cols` kolommen in `container`: een scheidingslijn voor iedere nieuwe rij,
+        // behalve de eerste. Een element dat de hele rij beslaat (span === cols) begint een nieuwe
+        // rij. place() geeft een functie terug die de plaatsing ongedaan maakt.
+        const makeFlow = (container, cols) => {
+          let column = 0; // aantal gevulde kolommen in de huidige rij
 
-          // Een uitgeklapte regel begint op de eerstvolgende kolom die een veelvoud van zijn
-          // breedte is (bij 4 kolommen: kolom 1 of 3); past hij niet meer, dan op een nieuwe rij
-          if (open) {
-            const start = Math.ceil(column / span) * span;
+          return {
+            partial: () => column !== 0,
+            place(node, span) {
+              const previous = column;
+              const added = [];
 
-            if (start >= columns) {
-              if (column !== 0) addDivider();
-              column = 0;
-            } else {
-              column = start;
+              if (span === cols) column = 0;
+
+              if (column === 0 && container.childElementCount) {
+                const divider = makeDivider();
+                container.append(divider);
+                added.push(divider);
+              }
+
+              container.append(node);
+              added.push(node);
+              column = span === cols ? 0 : (column + 1) % cols;
+
+              return () => {
+                added.forEach((added_node) => added_node.remove());
+                column = previous;
+              };
             }
+          };
+        };
+
+        const put = (flow, index, span, gridColumn = "") => {
+          rows[index].el.style.gridColumn = gridColumn;
+          rows[index].el.style.gridRow = "";
+          return flow.place(rows[index].el, span);
+        };
+
+        const mainFlow = makeFlow(this._grid, columns);
+
+        if (columns !== 4) {
+          rows.forEach((row, index) => {
+            const open = isOpen(index);
+            put(mainFlow, index, open ? columns : 1, open ? "1 / -1" : "");
+          });
+
+          this._observeBands();
+          this._fitSummaries();
+          return;
+        }
+
+        // Vier kolommen: losse regels vullen rijen van vier; een uitgeklapte regel krijgt een band
+        const pending = []; // regels van de huidige (nog onvolledige) rij
+
+        const flush = () => {
+          pending.splice(0).forEach((index) => put(mainFlow, index, 1));
+        };
+
+        let i = 0;
+
+        while (i <= last) {
+          if (!isOpen(i)) {
+            pending.push(i);
+            i++;
+            if (pending.length === 4) flush();
+            continue;
           }
 
-          row.el.style.gridColumn = open ? `${column + 1} / span ${span}` : "";
-          children.push(row.el);
+          // Staan er al regels in de rij, dan staat de uitgeklapte regel rechts en komen die
+          // regels (en de volgende) links ernaast; anders staat hij links
+          const openLeft = pending.length === 0;
+          const openRow = rows[i];
 
-          column += open ? span : 1;
+          const band = document.createElement("div");
+          band.className = "band";
+          band.style.columnGap = `${COLUMN_GAP}px`;
 
-          if (column >= columns) {
-            column = 0;
-            if (index !== lastIndex) addDivider();
+          const side = document.createElement("div");
+          side.className = "band-side";
+          side.style.columnGap = `${COLUMN_GAP}px`;
+          side.style.gridColumn = openLeft ? "3 / span 2" : "1 / span 2";
+          side.style.gridRow = "1";
+
+          openRow.el.style.gridColumn = openLeft ? "1 / span 2" : "3 / span 2";
+          openRow.el.style.gridRow = "1";
+
+          band.append(...(openLeft ? [openRow.el, side] : [side, openRow.el]));
+          mainFlow.place(band, 4);
+
+          const sideFlow = makeFlow(side, 2);
+
+          pending.splice(0).forEach((index) => put(sideFlow, index, 1));
+
+          // Vul de zijkant tot zijn hoogte zo dicht mogelijk bij die van de uitgeklapte regel komt
+          const height = openRow.el.offsetHeight;
+          this._bandHeights.set(openRow.el, height);
+
+          let j = i + 1;
+
+          while (j <= last && !isOpen(j)) {
+            const freeCell = sideFlow.partial(); // een vrije cel in de laatste rij kost geen hoogte
+            const before = side.offsetHeight;
+
+            if (!freeCell && before >= height) break;
+
+            const undo = put(sideFlow, j, 1);
+
+            if (!freeCell) {
+              const after = side.offsetHeight;
+
+              if (after > height && after - height >= height - before) {
+                undo();
+                break;
+              }
+            }
+
+            j++;
           }
-        });
 
-        this._grid.replaceChildren(...children);
+          i = j;
+        }
+
+        flush();
+        this._observeBands();
         this._fitSummaries();
+      }
+
+      // Past de banden opnieuw aan als een uitgeklapte regel van hoogte verandert
+      // (bijvoorbeeld door een andere breedte of nieuwe inhoud)
+      _observeBands() {
+        if (!this._bandObserver) {
+          this._bandObserver = new ResizeObserver(() => {
+            if (this._columns !== 4 || this._bandRefit) return;
+
+            const changed = [...(this._bandHeights || [])].some(
+              ([element, height]) => Math.abs(element.offsetHeight - height) >= 2
+            );
+
+            if (!changed) return;
+
+            this._bandRefit = requestAnimationFrame(() => {
+              this._bandRefit = null;
+              if (this._columns === 4 && !this._disposed) this._applyLayout(4);
+            });
+          });
+        }
+
+        this._bandObserver.disconnect();
+        (this._bandHeights || new Map()).forEach((height, element) => this._bandObserver.observe(element));
       }
 
       // Past de tweede regel (waarden) in de beschikbare breedte: van achteren af verdwijnen hele
