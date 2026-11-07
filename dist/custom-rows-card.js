@@ -17,9 +17,9 @@
     const COLUMN_GAP = 20; // px
 
     // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "temperatures", "consumption"];
+    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "sensors", "consumption"];
     const DEFAULT_STEP = 0.5; // °C per klik bij een climate
-    const MAX_TEMPERATURES = 8; // maximaal aantal sensoren bij een temperatures-element
+    const MAX_SENSORS = 8; // maximaal aantal entiteiten bij een sensors-element
 
     // Verbruik (consumption): waarden in de volgorde van links naar rechts
     const CONSUMPTION_VALUES = [
@@ -144,12 +144,20 @@
               throw { key: "error.rows_extra_type", params };
             }
 
-            // temperatures: een lijst met sensoren (entities) in plaats van één entity;
-            // meer dan MAX_TEMPERATURES sensoren worden genegeerd
-            if (extra.type === "temperatures") {
+            // sensors: een lijst met entiteiten (entities) in plaats van één entity. Een item is een
+            // entity_id of een object { entity, icon, hide_icon, label }; meer dan MAX_SENSORS
+            // items worden genegeerd
+            if (extra.type === "sensors") {
               const entities = (Array.isArray(extra.entities) ? extra.entities : [])
-                .filter((id) => typeof id === "string" && id)
-                .slice(0, MAX_TEMPERATURES);
+                .map((item) => (typeof item === "string" ? { entity: item } : item))
+                .filter((item) => item && typeof item.entity === "string" && item.entity)
+                .slice(0, MAX_SENSORS)
+                .map((item) => ({
+                  entity: item.entity,
+                  icon: typeof item.icon === "string" && item.icon ? item.icon : undefined, // optioneel: vervangt het nummericoon
+                  hideIcon: item.hide_icon === true, // optioneel: toont geen icoon
+                  label: item.label !== undefined && item.label !== null && item.label !== "" ? String(item.label) : undefined // optioneel: vet label
+                }));
 
               if (!entities.length) {
                 throw { key: "error.rows_extra_entity", params };
@@ -366,7 +374,7 @@
               if (extra.type === "power_switch") return this._buildPowerSwitch(extra);
               if (extra.type === "cover") return this._buildCover(extra);
               if (extra.type === "light") return this._buildLight(extra);
-              if (extra.type === "temperatures") return this._buildTemperatures(extra);
+              if (extra.type === "sensors") return this._buildSensors(extra);
               if (extra.type === "consumption") return this._buildConsumption(extra);
               return this._buildMedia(extra);
             });
@@ -1315,13 +1323,15 @@
         return { el, update, dispose };
       }
 
-      // ----- Extra element: temperaturen -----
+      // ----- Extra element: sensoren -----
 
-      // Compacte rij: thermometer (zonder label) | per sensor [mdi:numeric-n-box] waarde
-      // De eerste sensor staat links (1), de laatste rechts (maximaal 8).
-      _buildTemperatures(extra) {
+      // Compacte rij: icoon (zonder label) | per item [icoon] [label] waarde
+      // Het icoon is standaard mdi:numeric-n-box (n = positie in de lijst), per item te vervangen
+      // of te verbergen. Het label is optioneel en vet. De waarde neemt de eenheid van de entiteit
+      // over. De eerste entiteit staat links, de laatste rechts (maximaal 8).
+      _buildSensors(extra) {
         const el = document.createElement("div");
-        el.className = "extra extra-power extra-temperatures";
+        el.className = "extra extra-power extra-sensors";
 
         const view = document.createElement("div");
         view.className = "extra-view";
@@ -1336,20 +1346,30 @@
         const right = document.createElement("div");
         right.className = "extra-right";
 
-        const items = extra.entities.map((entityId, index) => {
+        const items = extra.entities.map(({ entity, icon: iconOverride, hideIcon, label }, index) => {
           const item = document.createElement("span");
-          item.className = "temperature-item";
+          item.className = "sensor-item";
 
-          const numberIcon = document.createElement("ha-icon");
-          numberIcon.icon = `mdi:numeric-${index + 1}-box`;
+          if (!hideIcon) {
+            const itemIcon = document.createElement("ha-icon");
+            itemIcon.icon = iconOverride || `mdi:numeric-${index + 1}-box`;
+            item.append(itemIcon);
+          }
+
+          if (label) {
+            const labelEl = document.createElement("span");
+            labelEl.className = "sensor-label";
+            labelEl.textContent = label;
+            item.append(labelEl);
+          }
 
           const value = document.createElement("span");
 
-          item.append(numberIcon, value);
-          this._makeClickable(item, entityId);
+          item.append(value);
+          this._makeClickable(item, entity);
           right.append(item);
 
-          return { entityId, item, value };
+          return { entityId: entity, item, value };
         });
 
         view.append(iconWrap, right);
@@ -1357,7 +1377,7 @@
 
         const update = () => {
           items.forEach(({ entityId, item, value }) => {
-            const text = this._formatValue(entityId, 1, "°C");
+            const text = this._formatEntity(entityId);
 
             if (value.textContent !== text) value.textContent = text;
 
@@ -1632,6 +1652,32 @@
         return unit ? `${text} ${unit}` : text;
       }
 
+      // Willekeurige entiteit als tekst, met de eenheid van de entiteit zelf. Numerieke waarden
+      // volgen de weergavenauwkeurigheid van Home Assistant; andere waarden tonen hun (vertaalde) status.
+      _formatEntity(entityId) {
+        const state = this._getState(entityId);
+
+        if (!state || state.state === "unavailable" || state.state === "unknown") return "—";
+
+        if (this._hass?.formatEntityState) return this._hass.formatEntityState(state);
+
+        const value = toNumber(state.state);
+
+        if (value === null) return state.state;
+
+        let text;
+
+        try {
+          text = value.toLocaleString(this._language, { maximumFractionDigits: 2 });
+        } catch (err) {
+          text = String(value);
+        }
+
+        const unit = state.attributes?.unit_of_measurement;
+
+        return unit ? `${text} ${unit}` : text;
+      }
+
       _update() {
         if (!this._hass || !this._rows) return;
 
@@ -1681,7 +1727,7 @@
     registerCard("custom-rows-card", CustomRowsCard, {
       id: "rows",
       name: "Custom Rows Card",
-      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch / temperatures / consumption elements.",
+      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch / sensors / consumption elements.",
       editor: {
         schema: [
           { name: "entries", selector: { object: {} } },
