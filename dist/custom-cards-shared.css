@@ -1081,3 +1081,22 @@ ha-card {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Lichtbron: [hidden] moet winnen van display: flex van .icon-btn */
+.icon-btn[hidden] {
+  display: none;
+}
+
+/* Kleurknop van een lamp: vierkant vlak in de huidige kleur met een lichtgrijze rand van 1 px */
+.icon-btn.color-btn ha-icon {
+  display: none;
+}
+
+.color-swatch {
+  display: block;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 1px solid lightgray;
+  border-radius: 3px;
+}

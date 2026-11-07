@@ -322,7 +322,8 @@ entity name and icon. Supported types:
 - `power_switch`: shows the switch state, optionally a `power` sensor and
   `status` binary sensor. Set `switchable: true` to enable control. Turning off
   a switch while its `status` sensor is on requires an inline confirmation;
-  the prompt closes after five seconds.
+  the prompt closes after five seconds. The name is bold only while the `status`
+  binary sensor is on; otherwise it is shown in regular weight.
 - `cover`: controls a cover (e.g. sunscreen or blinds). The button on the left
   (`mdi:window-open`) toggles between open and closed. Next to it the name is
   shown in bold, with the state and, when the cover reports a position, how far
@@ -340,6 +341,12 @@ entity name and icon. Supported types:
   the icon is grey. The
   toggle shows `mdi:toggle-switch-variant` in green when on and
   `mdi:toggle-switch-variant-off` in grey when off. Clicking it switches the light.
+  If the light supports colour or colour temperature, a square button showing
+  the current colour of the light (light-grey 1 px border) appears to the left of
+  the toggle; it opens the standard Home Assistant dialog of the light. If the
+  brightness can be set, a button (`mdi:gesture-swipe-horizontal`) to the left of
+  that replaces the row with a full-width brightness slider (0% switches the
+  light off). The button on its right (`mdi:gesture-tap-button`) restores the row.
 
 ```yaml
 type: custom:custom-rows-card
