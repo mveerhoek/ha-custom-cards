@@ -617,7 +617,7 @@ ha-card {
 /* Regels onder elkaar; de kaart zet het aantal kolommen (1, 2 of 4) en de kolomafstand.
    De scheidingslijn tussen twee rijen is een .divider over de volle breedte.
    Een uitgeklapte regel beslaat de hele rij, bij 4 kolommen de meest linker of de meest rechter
-   twee kolommen (de kaart zet grid-column op de regel). */
+   twee kolommen (de kaart zet grid-column op de regel en plaatst hem in een .band). */
 .entries {
   display: grid;
   align-items: start;
@@ -626,6 +626,23 @@ ha-card {
 .entries .divider {
   grid-column: 1 / -1;
   margin: var(--cc-entry-gap) 0;
+}
+
+/* Vier kolommen: een uitgeklapte regel staat in een band, links of rechts twee kolommen breed.
+   Op de twee andere kolommen (.band-side) staan de overige regels in twee kolommen, zodat naast de
+   uitgeklapte regel geen lege ruimte overblijft (de kaart bepaalt hoeveel regels er passen). */
+.entries .band {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+}
+
+.entries .band-side {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  min-width: 0;
 }
 
 .entry {
