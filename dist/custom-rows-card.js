@@ -156,7 +156,7 @@
                   entity: item.entity,
                   icon: typeof item.icon === "string" && item.icon ? item.icon : undefined, // optioneel: vervangt het nummericoon
                   hideIcon: item.hide_icon === true, // optioneel: toont geen icoon
-                  label: item.label !== undefined && item.label !== null && item.label !== "" ? String(item.label) : undefined // optioneel: vet label
+                  label: item.label !== undefined && item.label !== null && item.label !== "" ? String(item.label) : undefined // optioneel: label (normaal)
                 }));
 
               if (!entities.length) {
@@ -166,7 +166,8 @@
               return {
                 type: extra.type,
                 entities,
-                icon: extra.icon // optioneel: overschrijft mdi:thermometer
+                icon: extra.icon, // optioneel: overschrijft mdi:thermometer
+                label: extra.label !== undefined && extra.label !== null && extra.label !== "" ? String(extra.label) : undefined // optioneel: vet label van de rij
               };
             }
 
@@ -1325,9 +1326,10 @@
 
       // ----- Extra element: sensoren -----
 
-      // Compacte rij: icoon (zonder label) | per item [icoon] [label] waarde
-      // Het icoon is standaard mdi:numeric-n-box (n = positie in de lijst), per item te vervangen
-      // of te verbergen. Het label is optioneel en vet. De waarde neemt de eenheid van de entiteit
+      // Compacte rij: icoon | [label van de rij, vet] | per item [icoon] [label] waarde
+      // Het label van de rij is optioneel en staat rechts van het hoofdicoon. Het icoon van een item
+      // is standaard mdi:numeric-n-box (n = positie in de lijst), per item te vervangen of te
+      // verbergen. Het label van een item is optioneel en normaal van gewicht. De waarde neemt de eenheid van de entiteit
       // over. De eerste entiteit staat links, de laatste rechts (maximaal 8).
       _buildSensors(extra) {
         const el = document.createElement("div");
@@ -1342,6 +1344,15 @@
         const icon = document.createElement("ha-icon");
         icon.icon = extra.icon || "mdi:thermometer";
         iconWrap.append(icon);
+
+        let rowLabel = null;
+
+        if (extra.label) {
+          rowLabel = document.createElement("div");
+          rowLabel.className = "entry-name";
+          rowLabel.textContent = extra.label;
+          rowLabel.title = extra.label;
+        }
 
         const right = document.createElement("div");
         right.className = "extra-right";
@@ -1372,7 +1383,8 @@
           return { entityId: entity, item, value };
         });
 
-        view.append(iconWrap, right);
+        if (rowLabel) view.append(iconWrap, rowLabel, right);
+        else view.append(iconWrap, right);
         el.append(view);
 
         const update = () => {
