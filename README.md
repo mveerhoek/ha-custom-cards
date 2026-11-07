@@ -349,7 +349,6 @@ Each extra requires `type` and `entity` (except `temperatures`, which uses
   light off). The button on its right (`mdi:gesture-tap-button`) restores the row.
   If the brightness can be set, a second line below the name (regular weight)
   shows the brightness as a percentage.
-
 - `temperatures`: a compact row showing up to 8 temperature sensors. Instead of
   `entity` it takes `entities`, a list of sensor entities; sensors beyond the
   eighth are ignored. The row has a grey `mdi:thermometer` icon on the left
