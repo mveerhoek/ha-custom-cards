@@ -17,8 +17,9 @@
     const COLUMN_GAP = 20; // px
 
     // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light"];
+    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "temperatures"];
     const DEFAULT_STEP = 0.5; // °C per klik bij een climate
+    const MAX_TEMPERATURES = 8; // maximaal aantal sensoren bij een temperatures-element
 
     const MEDIA_ICONS = {
       tv: "mdi:television",
@@ -134,6 +135,25 @@
             if (!extra || !EXTRA_TYPES.includes(extra.type)) {
               throw { key: "error.rows_extra_type", params };
             }
+
+            // temperatures: een lijst met sensoren (entities) in plaats van één entity;
+            // meer dan MAX_TEMPERATURES sensoren worden genegeerd
+            if (extra.type === "temperatures") {
+              const entities = (Array.isArray(extra.entities) ? extra.entities : [])
+                .filter((id) => typeof id === "string" && id)
+                .slice(0, MAX_TEMPERATURES);
+
+              if (!entities.length) {
+                throw { key: "error.rows_extra_entity", params };
+              }
+
+              return {
+                type: extra.type,
+                entities,
+                icon: extra.icon // optioneel: overschrijft mdi:thermometer
+              };
+            }
+
             if (!extra.entity) {
               throw { key: "error.rows_extra_entity", params };
             }
@@ -318,6 +338,7 @@
               if (extra.type === "power_switch") return this._buildPowerSwitch(extra);
               if (extra.type === "cover") return this._buildCover(extra);
               if (extra.type === "light") return this._buildLight(extra);
+              if (extra.type === "temperatures") return this._buildTemperatures(extra);
               return this._buildMedia(extra);
             });
             extrasEl.append(...extras.map((extra) => extra.el));
@@ -1265,6 +1286,61 @@
         return { el, update, dispose };
       }
 
+      // ----- Extra element: temperaturen -----
+
+      // Compacte rij: thermometer (zonder label) | per sensor [mdi:numeric-n-box] waarde
+      // De eerste sensor staat links (1), de laatste rechts (maximaal 8).
+      _buildTemperatures(extra) {
+        const el = document.createElement("div");
+        el.className = "extra extra-power extra-temperatures";
+
+        const view = document.createElement("div");
+        view.className = "extra-view";
+
+        const iconWrap = document.createElement("div");
+        iconWrap.className = "power-icon";
+
+        const icon = document.createElement("ha-icon");
+        icon.icon = extra.icon || "mdi:thermometer";
+        iconWrap.append(icon);
+
+        const right = document.createElement("div");
+        right.className = "extra-right";
+
+        const items = extra.entities.map((entityId, index) => {
+          const item = document.createElement("span");
+          item.className = "temperature-item";
+
+          const numberIcon = document.createElement("ha-icon");
+          numberIcon.icon = `mdi:numeric-${index + 1}-box`;
+
+          const value = document.createElement("span");
+
+          item.append(numberIcon, value);
+          this._makeClickable(item, entityId);
+          right.append(item);
+
+          return { entityId, item, value };
+        });
+
+        view.append(iconWrap, right);
+        el.append(view);
+
+        const update = () => {
+          items.forEach(({ entityId, item, value }) => {
+            const text = this._formatValue(entityId, 1, "°C");
+
+            if (value.textContent !== text) value.textContent = text;
+
+            const title = this._getState(entityId)?.attributes?.friendly_name;
+
+            if (title) item.title = title;
+          });
+        };
+
+        return { el, update };
+      }
+
       // ----- Extra element: stroomschakelaar -----
 
       // Compacte rij: icoon | naam (dik) | vermogen | status binary sensor | schakelaar
@@ -1520,7 +1596,7 @@
     registerCard("custom-rows-card", CustomRowsCard, {
       id: "rows",
       name: "Custom Rows Card",
-      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch elements.",
+      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch / temperatures elements.",
       editor: {
         schema: [
           { name: "entries", selector: { object: {} } },
