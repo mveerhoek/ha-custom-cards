@@ -17,9 +17,17 @@
     const COLUMN_GAP = 20; // px
 
     // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "temperatures"];
+    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "temperatures", "consumption"];
     const DEFAULT_STEP = 0.5; // °C per klik bij een climate
     const MAX_TEMPERATURES = 8; // maximaal aantal sensoren bij een temperatures-element
+
+    // Verbruik (consumption): waarden in de volgorde van links naar rechts
+    const CONSUMPTION_VALUES = [
+      { key: "energy_import", icon: "mdi:transmission-tower-import", decimals: 1, unit: "kWh" },
+      { key: "energy_export", icon: "mdi:transmission-tower-export", decimals: 1, unit: "kWh" },
+      { key: "gas", icon: "mdi:meter-gas", decimals: 2, unit: "m³" },
+      { key: "water", icon: "mdi:water", decimals: 2, unit: "m³" }
+    ];
 
     const MEDIA_ICONS = {
       tv: "mdi:television",
@@ -151,6 +159,26 @@
                 type: extra.type,
                 entities,
                 icon: extra.icon // optioneel: overschrijft mdi:thermometer
+              };
+            }
+
+            // consumption: losse sensoren per soort (energy_import, energy_export, gas, water);
+            // minstens één is nodig, niet geconfigureerde waarden worden niet getoond
+            if (extra.type === "consumption") {
+              const sensors = {};
+
+              CONSUMPTION_VALUES.forEach(({ key }) => {
+                if (typeof extra[key] === "string" && extra[key]) sensors[key] = extra[key];
+              });
+
+              if (!Object.keys(sensors).length) {
+                throw { key: "error.rows_extra_entity", params };
+              }
+
+              return {
+                type: extra.type,
+                ...sensors,
+                icon: extra.icon // optioneel: overschrijft mdi:counter
               };
             }
 
@@ -339,6 +367,7 @@
               if (extra.type === "cover") return this._buildCover(extra);
               if (extra.type === "light") return this._buildLight(extra);
               if (extra.type === "temperatures") return this._buildTemperatures(extra);
+              if (extra.type === "consumption") return this._buildConsumption(extra);
               return this._buildMedia(extra);
             });
             extrasEl.append(...extras.map((extra) => extra.el));
@@ -1341,6 +1370,62 @@
         return { el, update };
       }
 
+      // ----- Extra element: verbruik -----
+
+      // Compacte rij: teller (zonder label) | [import] [export] [gas] [water]
+      // Alleen de geconfigureerde waarden worden getoond, altijd in deze volgorde.
+      _buildConsumption(extra) {
+        const el = document.createElement("div");
+        el.className = "extra extra-power extra-consumption";
+
+        const view = document.createElement("div");
+        view.className = "extra-view";
+
+        const iconWrap = document.createElement("div");
+        iconWrap.className = "power-icon";
+
+        const icon = document.createElement("ha-icon");
+        icon.icon = extra.icon || "mdi:counter";
+        iconWrap.append(icon);
+
+        const right = document.createElement("div");
+        right.className = "extra-right";
+
+        const items = CONSUMPTION_VALUES.filter((def) => extra[def.key]).map((def) => {
+          const item = document.createElement("span");
+          item.className = "consumption-item";
+
+          const itemIcon = document.createElement("ha-icon");
+          itemIcon.icon = def.icon;
+
+          const value = document.createElement("span");
+
+          item.append(itemIcon, value);
+          this._makeClickable(item, extra[def.key]);
+          right.append(item);
+
+          return { def, item, value };
+        });
+
+        view.append(iconWrap, right);
+        el.append(view);
+
+        const update = () => {
+          items.forEach(({ def, item, value }) => {
+            const entityId = extra[def.key];
+            const text = this._formatValue(entityId, def.decimals, def.unit);
+
+            if (value.textContent !== text) value.textContent = text;
+
+            const title = this._getState(entityId)?.attributes?.friendly_name;
+
+            if (title) item.title = title;
+          });
+        };
+
+        return { el, update };
+      }
+
       // ----- Extra element: stroomschakelaar -----
 
       // Compacte rij: icoon | naam (dik) | vermogen | status binary sensor | schakelaar
@@ -1596,7 +1681,7 @@
     registerCard("custom-rows-card", CustomRowsCard, {
       id: "rows",
       name: "Custom Rows Card",
-      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch / temperatures elements.",
+      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch / temperatures / consumption elements.",
       editor: {
         schema: [
           { name: "entries", selector: { object: {} } },
