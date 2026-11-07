@@ -12,7 +12,8 @@
       { key: "power", decimals: 0, unit: "W" }
     ];
 
-    // Twee kolommen zodra beide minstens MIN_COLUMN_WIDTH breed kunnen zijn
+    // Het aantal kolommen is 1, 2 of 4: twee kolommen zodra beide minstens MIN_COLUMN_WIDTH breed
+    // kunnen zijn, vier kolommen zodra alle vier dat kunnen
     const MIN_COLUMN_WIDTH = 160; // px
     const COLUMN_GAP = 20; // px
 
@@ -406,7 +407,9 @@
 
         this._observer = new ResizeObserver((records) => {
           const width = records[0].contentRect.width;
-          const columns = width >= 2 * MIN_COLUMN_WIDTH + COLUMN_GAP ? 2 : 1;
+          const columns = width >= 4 * MIN_COLUMN_WIDTH + 3 * COLUMN_GAP ? 4
+            : width >= 2 * MIN_COLUMN_WIDTH + COLUMN_GAP ? 2
+            : 1;
 
           // Bij een nieuw aantal kolommen worden de regels opnieuw geplaatst (en gemeten);
           // anders kan alleen de beschikbare breedte veranderd zijn
@@ -419,13 +422,17 @@
       }
 
       // Plaatst de regels in het raster, met een scheidingslijn na iedere volle rij.
-      // Een uitgeklapte regel krijgt een eigen rij over de volle breedte.
+      // Een uitgeklapte regel beslaat bij 1 of 2 kolommen de volle breedte; bij 4 kolommen de
+      // meest linker of de meest rechter twee kolommen. Staat de regel op een oneven kolom, dan
+      // schuift hij door naar de volgende twee kolommen (links of rechts), zodat er hooguit één
+      // kolom leeg blijft; past hij niet meer in de rij, dan begint hij op een nieuwe rij links.
       _applyLayout(columns) {
         this._columns = columns;
         this._grid.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
 
         const children = [];
         const lastIndex = this._rows.length - 1;
+        const span = columns === 4 ? 2 : columns; // breedte (in kolommen) van een uitgeklapte regel
         let column = 0; // aantal gevulde kolommen in de huidige rij
 
         const addDivider = () => {
@@ -437,16 +444,23 @@
         this._rows.forEach((row, index) => {
           const open = !!row.extrasEl && this._expanded.has(index);
 
-          // Een uitgeklapte regel begint op een nieuwe rij
-          if (open && column !== 0) {
-            addDivider();
-            column = 0;
+          // Een uitgeklapte regel begint op de eerstvolgende kolom die een veelvoud van zijn
+          // breedte is (bij 4 kolommen: kolom 1 of 3); past hij niet meer, dan op een nieuwe rij
+          if (open) {
+            const start = Math.ceil(column / span) * span;
+
+            if (start >= columns) {
+              if (column !== 0) addDivider();
+              column = 0;
+            } else {
+              column = start;
+            }
           }
 
-          row.el.style.gridColumn = open ? "1 / -1" : "";
+          row.el.style.gridColumn = open ? `${column + 1} / span ${span}` : "";
           children.push(row.el);
 
-          column = open ? columns : column + 1;
+          column += open ? span : 1;
 
           if (column >= columns) {
             column = 0;
