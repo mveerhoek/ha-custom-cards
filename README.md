@@ -354,7 +354,8 @@ which use `entities` and separate sensor options). `name` and `icon` override th
   humidity, power, a binary sensor, ...). Instead of `entity` it takes
   `entities`, a list of entity IDs or objects; items beyond the eighth are
   ignored. The row has a grey `mdi:thermometer` icon on the left (overridable
-  with `icon`) and no label. On the right every entity is shown as an icon,
+  with `icon`). An optional `label` on the row is shown in bold to the right
+  of this icon. On the right every entity is shown as an icon,
   an optional label and its value. The value uses the unit of the entity itself
   and follows the display precision set in Home Assistant; entities without a
   numeric state show their (translated) state. The first entity is on the left,
@@ -367,7 +368,7 @@ which use `entities` and separate sensor options). `name` and `icon` override th
   | `entity` | Entity ID (required) |
   | `icon` | Optional icon that replaces the default `mdi:numeric-n-box` icon (`n` = 1-8, the position in the list) |
   | `hide_icon` | Set to `true` to show no icon for this item |
-  | `label` | Optional bold label, shown to the right of the icon and before the value |
+  | `label` | Optional label in regular weight, shown to the right of the icon and before the value |
 
 - `consumption`: a compact row for energy, gas and water usage. It takes the
   options `energy_import`, `energy_export`, `gas` and `water` (all optional, at
@@ -408,6 +409,7 @@ entries:
         entity: light.living_room_lamp
         name: Floor lamp
       - type: sensors
+        label: Climate
         entities:
           - sensor.living_room_temperature
           - entity: sensor.living_room_floor_temperature
