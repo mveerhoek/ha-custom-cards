@@ -77,8 +77,17 @@
         const subtitleRow1 = document.createElement("div");
         subtitleRow1.className = "summary-row";
 
+        // Zelfde opbouw als de CPU/RAM-regel van custom-desktop-card:
+        // losse onderdelen met een "·" als scheidingsteken
         const subtitleRow2 = document.createElement("div");
         subtitleRow2.className = "summary-row";
+
+        const cpuItem = document.createElement("span");
+        const usageSeparator = document.createElement("span");
+        usageSeparator.textContent = "·";
+        const memoryItem = document.createElement("span");
+
+        subtitleRow2.append(cpuItem, usageSeparator, memoryItem);
 
         subtitle.append(subtitleRow1, subtitleRow2);
 
@@ -127,7 +136,8 @@
         this._setContent(card);
 
         this._subtitle = subtitleRow1;
-        this._usage = subtitleRow2;
+        this._cpuItem = cpuItem;
+        this._memoryItem = memoryItem;
         this._status = status;
         this._projectList = projectList;
 
@@ -366,11 +376,9 @@
           projects: this._t("docker.project_count", { count: projectCount })
         });
 
-        // Niet-brekende spaties binnen een onderdeel: afbreken kan alleen tussen onderdelen
-        this._usage.textContent = [
-          `CPU ${totalCpu.toFixed(1)}%`,
-          `RAM ${totalMemory.toFixed(0)} MB`
-        ].map(text => text.replace(/ /g, "\u00a0")).join(" - ");
+        // Zelfde weergave als custom-desktop-card: "CPU 1.2 %" · "RAM 1234 MB"
+        this._cpuItem.textContent = `${this._t("label.cpu")} ${this._formatNumber(totalCpu, 1)} %`;
+        this._memoryItem.textContent = `${this._t("label.ram")} ${this._formatNumber(totalMemory, 0)} MB`;
 
         this._status.textContent =
           total === 0 ? this._t("docker.status.none") :
