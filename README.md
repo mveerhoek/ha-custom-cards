@@ -298,9 +298,13 @@ The status is determined using the `device_tracker` entity:
 Displays one, two or four columns of entries, depending on the card width
 (two columns from 340 px, four columns from 700 px). An expanded entry spans
 the full width with one or two columns. With four columns it spans the two
-leftmost or the two rightmost columns, starting at column 1 or 3: an entry that
-would sit in column 1 or 3 expands there; one in column 2 moves on to columns
-3-4 (leaving column 2 empty); one in column 4 starts a new row at columns 1-2.
+leftmost or the two rightmost columns. The other two columns next to it are filled
+with the other entries of the card, as many as fit next to the expanded entry, so
+no empty space is left. If other entries are already in the row, the expanded entry
+moves to the right and those entries (followed by the next ones) go to its left;
+otherwise it is on the left and the following entries go to its right. The order of
+the entries therefore only changes while an entry is expanded and returns when it is
+collapsed.
 Values that do not fit are hidden from the end of the
 summary; clicking a displayed value opens its entity details.
 
