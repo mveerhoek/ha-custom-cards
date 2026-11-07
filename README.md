@@ -15,7 +15,7 @@ functionality.
 | **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices |
 | **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks |
 | **Custom Desktop Card** | Desktop computer status and performance |
-| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, temperatures, consumption) |
+| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, sensors, consumption) |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project |
 
 ## Installation
@@ -308,7 +308,7 @@ the end of the summary; clicking a displayed value opens its entity details.
 | `door` | No | Binary sensor: on/off displays an open/closed door badge |
 | `extras` | No | List of expandable controls |
 
-Each extra requires `type` and `entity` (except `temperatures` and `consumption`,
+Each extra requires `type` and `entity` (except `sensors` and `consumption`,
 which use `entities` and separate sensor options). `name` and `icon` override the entity name and icon. Supported types:
 
 - `media_player`: opens more-info from the icon; includes play/pause, volume,
@@ -350,14 +350,24 @@ which use `entities` and separate sensor options). `name` and `icon` override th
   If the brightness can be set, a second line below the name (regular weight)
   shows the brightness as a percentage.
 
-- `temperatures`: a compact row showing up to 8 temperature sensors. Instead of
-  `entity` it takes `entities`, a list of sensor entities; sensors beyond the
-  eighth are ignored. The row has a grey `mdi:thermometer` icon on the left
-  (overridable with `icon`) and no label. On the right every sensor is shown as
-  an `mdi:numeric-n-box` icon followed by its temperature, where `n` (1-8) is the
-  position in the list: the first sensor is on the left, the last on the right.
-  If the sensors do not fit on one line they continue on the next line.
-  Clicking a sensor opens its entity details.
+- `sensors`: a compact row showing up to 8 entities of any kind (temperature,
+  humidity, power, a binary sensor, ...). Instead of `entity` it takes
+  `entities`, a list of entity IDs or objects; items beyond the eighth are
+  ignored. The row has a grey `mdi:thermometer` icon on the left (overridable
+  with `icon`) and no label. On the right every entity is shown as an icon,
+  an optional label and its value. The value uses the unit of the entity itself
+  and follows the display precision set in Home Assistant; entities without a
+  numeric state show their (translated) state. The first entity is on the left,
+  the last on the right. If they do not fit on one line they continue on the
+  next line. Clicking an item opens its entity details. An item is either a
+  plain entity ID or an object with these options:
+
+  | Item option | Description |
+  | :--- | :--- |
+  | `entity` | Entity ID (required) |
+  | `icon` | Optional icon that replaces the default `mdi:numeric-n-box` icon (`n` = 1-8, the position in the list) |
+  | `hide_icon` | Set to `true` to show no icon for this item |
+  | `label` | Optional bold label, shown to the right of the icon and before the value |
 
 - `consumption`: a compact row for energy, gas and water usage. It takes the
   options `energy_import`, `energy_export`, `gas` and `water` (all optional, at
@@ -397,11 +407,17 @@ entries:
       - type: light
         entity: light.living_room_lamp
         name: Floor lamp
-      - type: temperatures
+      - type: sensors
         entities:
           - sensor.living_room_temperature
-          - sensor.living_room_floor_temperature
-          - sensor.living_room_window_temperature
+          - entity: sensor.living_room_floor_temperature
+            icon: mdi:floor-plan
+          - entity: sensor.living_room_humidity
+            hide_icon: true
+            label: Humidity
+          - entity: sensor.living_room_co2
+            icon: mdi:molecule-co2
+            label: CO2
       - type: consumption
         energy_import: sensor.energy_import_today
         energy_export: sensor.energy_export_today

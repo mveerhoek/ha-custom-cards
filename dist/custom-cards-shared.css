@@ -870,19 +870,20 @@ ha-card {
 }
 
 /* Verbruik (consumption) deelt deze opmaak.
-   Temperaturen (temperatures): thermometer links, rechts per sensor een nummericoon en de waarde.
+   Sensoren (sensors): icoon links, rechts per entiteit een icoon (standaard nummericoon), een
+   optioneel vet label en de waarde.
    Past het niet op één regel, dan lopen de sensoren door op een volgende regel (rechts uitgelijnd). */
-.extra-temperatures .extra-view,
+.extra-sensors .extra-view,
 .extra-consumption .extra-view {
   align-items: flex-start;
 }
 
-.extra-temperatures .power-icon,
+.extra-sensors .power-icon,
 .extra-consumption .power-icon {
   height: 24px;
 }
 
-.extra-temperatures .extra-right,
+.extra-sensors .extra-right,
 .extra-consumption .extra-right {
   flex: 1 1 0;
   min-width: 0;
@@ -891,7 +892,7 @@ ha-card {
   gap: 4px 12px;
 }
 
-.temperature-item,
+.sensor-item,
 .consumption-item {
   display: inline-flex;
   align-items: center;
@@ -903,9 +904,15 @@ ha-card {
   font-variant-numeric: tabular-nums;
 }
 
-.temperature-item ha-icon,
+.sensor-item ha-icon,
 .consumption-item ha-icon {
   --mdc-icon-size: 18px;
+}
+
+/* Optioneel label van een sensors-item: vet, rechts van het icoon en links van de waarde */
+.sensor-label {
+  font-weight: 700;
+  margin-right: 2px;
 }
 
 /* Binary sensor: grijs, light green als hij aan staat */
