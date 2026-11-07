@@ -614,9 +614,10 @@ ha-card {
   --cc-power-status-color: #8bc34a;                    /* stroomschakelaar: binary sensor aan (light green) */
 }
 
-/* Regels onder elkaar; de kaart zet het aantal kolommen (1 of 2) en de kolomafstand.
+/* Regels onder elkaar; de kaart zet het aantal kolommen (1, 2 of 4) en de kolomafstand.
    De scheidingslijn tussen twee rijen is een .divider over de volle breedte.
-   Een uitgeklapte regel beslaat een hele rij (de kaart zet grid-column op de regel). */
+   Een uitgeklapte regel beslaat de hele rij, bij 4 kolommen de meest linker of de meest rechter
+   twee kolommen (de kaart zet grid-column op de regel). */
 .entries {
   display: grid;
   align-items: start;
