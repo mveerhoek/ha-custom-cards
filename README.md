@@ -347,6 +347,8 @@ entity name and icon. Supported types:
   brightness can be set, a button (`mdi:gesture-swipe-horizontal`) to the left of
   that replaces the row with a full-width brightness slider (0% switches the
   light off). The button on its right (`mdi:gesture-tap-button`) restores the row.
+  If the brightness can be set, a second line below the name (regular weight)
+  shows the brightness as a percentage.
 
 ```yaml
 type: custom:custom-rows-card

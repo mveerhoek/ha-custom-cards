@@ -1096,7 +1096,13 @@
 
         const name = document.createElement("div");
         name.className = "entry-name";
-        labels.append(name);
+
+        // Tweede regel (niet vet): helderheid in procenten, alleen bij dimbare lampen
+        const intensity = document.createElement("div");
+        intensity.className = "extra-status";
+        intensity.hidden = true;
+
+        labels.append(name, intensity);
 
         const right = document.createElement("div");
         right.className = "extra-right";
@@ -1232,6 +1238,13 @@
           if (!holding && !control.dragging) control.target = null;
 
           if (!control.dragging) slider.value = String(holding ? control.target : level);
+
+          intensity.hidden = !canDim;
+
+          const intensityText = available ? `${level}%` : "—";
+
+          intensity.textContent = intensityText;
+          intensity.title = intensityText;
 
           const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
 
