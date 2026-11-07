@@ -15,7 +15,7 @@ functionality.
 | **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices |
 | **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks |
 | **Custom Desktop Card** | Desktop computer status and performance |
-| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, temperatures) |
+| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, temperatures, consumption) |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project |
 
 ## Installation
@@ -308,8 +308,8 @@ the end of the summary; clicking a displayed value opens its entity details.
 | `door` | No | Binary sensor: on/off displays an open/closed door badge |
 | `extras` | No | List of expandable controls |
 
-Each extra requires `type` and `entity` (except `temperatures`, which uses
-`entities`). `name` and `icon` override the entity name and icon. Supported types:
+Each extra requires `type` and `entity` (except `temperatures` and `consumption`,
+which use `entities` and separate sensor options). `name` and `icon` override the entity name and icon. Supported types:
 
 - `media_player`: opens more-info from the icon; includes play/pause, volume,
   mute and album artwork when available.
@@ -349,6 +349,7 @@ Each extra requires `type` and `entity` (except `temperatures`, which uses
   light off). The button on its right (`mdi:gesture-tap-button`) restores the row.
   If the brightness can be set, a second line below the name (regular weight)
   shows the brightness as a percentage.
+
 - `temperatures`: a compact row showing up to 8 temperature sensors. Instead of
   `entity` it takes `entities`, a list of sensor entities; sensors beyond the
   eighth are ignored. The row has a grey `mdi:thermometer` icon on the left
@@ -357,6 +358,17 @@ Each extra requires `type` and `entity` (except `temperatures`, which uses
   position in the list: the first sensor is on the left, the last on the right.
   If the sensors do not fit on one line they continue on the next line.
   Clicking a sensor opens its entity details.
+
+- `consumption`: a compact row for energy, gas and water usage. It takes the
+  options `energy_import`, `energy_export`, `gas` and `water` (all optional, at
+  least one required) instead of `entity`. The row has a grey `mdi:counter` icon
+  on the left (overridable with `icon`) and no label. On the right the
+  configured values are shown from left to right in this fixed order: energy
+  import (`mdi:transmission-tower-import`), energy export
+  (`mdi:transmission-tower-export`), gas (`mdi:meter-gas`) and water (`mdi:water`),
+  each with its value and unit. Values that are not configured are left out.
+  If they do not fit on one line they continue on the next line. Clicking a
+  value opens its entity details.
 
 ```yaml
 type: custom:custom-rows-card
@@ -390,6 +402,11 @@ entries:
           - sensor.living_room_temperature
           - sensor.living_room_floor_temperature
           - sensor.living_room_window_temperature
+      - type: consumption
+        energy_import: sensor.energy_import_today
+        energy_export: sensor.energy_export_today
+        gas: sensor.gas_consumption_today
+        water: sensor.water_consumption_today
 ```
 
 `value_order` is set per entry and accepts `temperature`, `humidity`,
