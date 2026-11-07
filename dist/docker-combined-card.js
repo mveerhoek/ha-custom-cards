@@ -73,46 +73,30 @@
         const subtitle = document.createElement("div");
         subtitle.className = "card-summary";
 
+        // Regel 1: "x containers in y projecten", regel 2: CPU en RAM (totaal)
+        const subtitleRow1 = document.createElement("div");
+        subtitleRow1.className = "summary-row";
+
+        // Zelfde opbouw als de CPU/RAM-regel van custom-desktop-card:
+        // losse onderdelen met een "·" als scheidingsteken
+        const subtitleRow2 = document.createElement("div");
+        subtitleRow2.className = "summary-row";
+
+        const cpuItem = document.createElement("span");
+        const usageSeparator = document.createElement("span");
+        usageSeparator.textContent = "·";
+        const memoryItem = document.createElement("span");
+
+        subtitleRow2.append(cpuItem, usageSeparator, memoryItem);
+
+        subtitle.append(subtitleRow1, subtitleRow2);
+
         info.append(title, subtitle);
 
         const status = document.createElement("div");
         status.className = "status-badge";
 
         header.append(icon, info, status);
-
-        // Divider
-        const divider = document.createElement("div");
-        divider.className = "divider";
-
-        // Metrics
-        const metrics = document.createElement("div");
-        metrics.className = "metrics";
-
-        const createMetric = labelText => {
-          const metric = document.createElement("div");
-          metric.className = "metric";
-
-          const label = document.createElement("div");
-          label.className = "metric-label";
-          label.textContent = labelText;
-
-          const value = document.createElement("div");
-          value.className = "metric-value";
-
-          metric.append(label, value);
-
-          return { metric, value };
-        };
-
-        const containersMetric = createMetric(this._t("docker.metric.containers"));
-        const cpuMetric = createMetric(this._t("docker.metric.cpu"));
-        const memoryMetric = createMetric(this._t("docker.metric.memory"));
-
-        metrics.append(
-          containersMetric.metric,
-          cpuMetric.metric,
-          memoryMetric.metric
-        );
 
         // Projectenlijst
         const projectList = document.createElement("div");
@@ -147,15 +131,14 @@
 
         this._onActivate(header, toggleProjects);
 
-        card.append(header, divider, metrics, projectList);
+        card.append(header, projectList);
 
         this._setContent(card);
 
-        this._subtitle = subtitle;
+        this._subtitle = subtitleRow1;
+        this._cpuItem = cpuItem;
+        this._memoryItem = memoryItem;
         this._status = status;
-        this._containersValue = containersMetric.value;
-        this._cpuValue = cpuMetric.value;
-        this._memoryValue = memoryMetric.value;
         this._projectList = projectList;
 
         this._update();
@@ -385,7 +368,6 @@
           }
         }
 
-        this._containersValue.textContent = `${running} / ${total}`;
         // Aantal projecten: de geconfigureerde projecten plus "Other" als die containers heeft
         const projectCount = this._projects.length + (otherNames.length ? 1 : 0);
 
@@ -393,8 +375,10 @@
           containers: this._t("docker.container_count", { count: total }),
           projects: this._t("docker.project_count", { count: projectCount })
         });
-        this._cpuValue.textContent = `${totalCpu.toFixed(1)}%`;
-        this._memoryValue.textContent = `${totalMemory.toFixed(0)} MB`;
+
+        // Zelfde weergave als custom-desktop-card: "CPU 1.2 %" · "RAM 1234 MB"
+        this._cpuItem.textContent = `${this._t("label.cpu")} ${this._formatNumber(totalCpu, 1)} %`;
+        this._memoryItem.textContent = `${this._t("label.ram")} ${this._formatNumber(totalMemory, 0)} MB`;
 
         this._status.textContent =
           total === 0 ? this._t("docker.status.none") :
