@@ -208,10 +208,19 @@
             };
           });
 
+          // state_colors (alleen bij een input_select): lijst van { state, color }; een ongeldig
+          // item wordt genegeerd, een status zonder item houdt het standaard (grijze) icoon
+          const stateColors = typeof entry.switch === "string" && entry.switch.startsWith("input_select.") && Array.isArray(entry.state_colors)
+            ? entry.state_colors
+              .filter((item) => item && item.state !== undefined && item.state !== null && typeof item.color === "string" && item.color)
+              .map((item) => ({ state: String(item.state), color: item.color }))
+            : [];
+
           return {
             name: entry.name,
             icon: entry.icon,
-            switch: entry.switch, // optioneel: schakelaar of lamp
+            switch: entry.switch, // optioneel: schakelaar, lamp of input_select (klik = select_next)
+            stateColors, // optioneel, alleen input_select: kleur van icoon en cirkel per status
             temperature: entry.temperature,
             humidity: entry.humidity,
             illuminance: entry.illuminance,
@@ -306,13 +315,16 @@
           });
 
           if (entry.switch) {
+            // Een input_select heeft geen aan/uit-status: die gedraagt zich als knop (select_next)
+            const isSelect = entry.switch.startsWith("input_select.");
+
             iconWrap.classList.add("switchable");
-            iconWrap.setAttribute("role", "switch");
+            iconWrap.setAttribute("role", isSelect ? "button" : "switch");
             iconWrap.setAttribute("tabindex", "0");
             iconWrap.setAttribute("aria-label", entry.name);
 
             // stopPropagation: schakelen klapt de regel niet uit
-            this._onActivate(iconWrap, () => this._toggle(entry.switch), { stopPropagation: true });
+            this._onActivate(iconWrap, () => this._activateMain(entry.switch), { stopPropagation: true });
           }
 
           const info = document.createElement("div");
@@ -656,6 +668,36 @@
         if (!this._hass || !state || state.state === "unavailable") return;
 
         this._callService("homeassistant", "toggle", { entity_id: entityId });
+      }
+
+      // Kleur die bij de huidige status van een input_select hoort (exacte status eerst,
+      // daarna zonder hoofdletters/spaties); null als de status niet is geconfigureerd
+      _stateColor(entry, state) {
+        if (!entry.stateColors?.length || !isAvailable(state)) return null;
+
+        const exact = entry.stateColors.find((item) => item.state === state.state);
+
+        if (exact) return exact.color;
+
+        const normalize = (value) => value.trim().toLowerCase();
+        const loose = entry.stateColors.find((item) => normalize(item.state) === normalize(state.state));
+
+        return loose ? loose.color : null;
+      }
+
+      // Klik op het hoofdicoon: een input_select gaat naar de volgende optie
+      // (input_select.select_next, daarna weer de eerste); alles anders wordt aan/uit gezet
+      _activateMain(entityId) {
+        if (!entityId.startsWith("input_select.")) {
+          this._toggle(entityId);
+          return;
+        }
+
+        const state = this._getState(entityId);
+
+        if (!this._hass || !state || state.state === "unavailable") return;
+
+        this._callService("input_select", "select_next", { entity_id: entityId, cycle: true });
       }
 
       async _callService(domain, service, data) {
@@ -1839,11 +1881,25 @@
         this._rows.forEach(({ entry, iconWrap, values, extras, badges }) => {
           if (entry.switch) {
             const state = this._getState(entry.switch);
-            const isOn = state?.state === "on";
+            const isSelect = entry.switch.startsWith("input_select.");
 
-            iconWrap.classList.toggle("on", isOn);
             iconWrap.classList.toggle("unavailable", !state || state.state === "unavailable");
-            iconWrap.setAttribute("aria-checked", String(isOn));
+
+            if (isSelect) {
+              // Een input_select is een knop: geen aan/uit-status (ook niet bij een optie "on"),
+              // maar een kleur per status
+              const color = this._stateColor(entry, state);
+
+              iconWrap.classList.toggle("has-state-color", !!color);
+
+              if (color) iconWrap.style.setProperty("--cc-state-color", color);
+              else iconWrap.style.removeProperty("--cc-state-color");
+            } else {
+              const isOn = state?.state === "on";
+
+              iconWrap.classList.toggle("on", isOn);
+              iconWrap.setAttribute("aria-checked", String(isOn));
+            }
           }
 
           // Getoonde badges krijgen op volgorde een hoek: eerst rechtsboven, dan rechtsonder
