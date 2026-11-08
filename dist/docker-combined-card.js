@@ -68,7 +68,7 @@
 
         const title = document.createElement("div");
         title.className = "card-title";
-        title.textContent = "Docker";
+        title.textContent = this._t("docker.title");
 
         const subtitle = document.createElement("div");
         subtitle.className = "card-summary";
@@ -256,8 +256,7 @@
                 confirmation: {
                   text: this._t(turnOff ? "docker.confirm_off" : "docker.confirm_on", { name })
                 }
-              },
-              name
+              }
             );
           });
 
@@ -477,10 +476,10 @@
         const nb = text => text.trim().replace(/ /g, "\u00a0");
 
         project.summary.textContent = [
-          nb(`CPU ${totalCpu.toFixed(1)}%`),
-          nb(`RAM ${totalMemory.toFixed(0)} MB`),
-          nb(`Rx: ${rxText}`),
-          nb(`Tx: ${txText}`)
+          nb(`${this._t("label.cpu")} ${totalCpu.toFixed(1)}%`),
+          nb(`${this._t("label.ram")} ${totalMemory.toFixed(0)} MB`),
+          nb(`${this._t("label.rx")}: ${rxText}`),
+          nb(`${this._t("label.tx")}: ${txText}`)
         ].join("  ·  ");
 
         project.status.textContent =
@@ -518,7 +517,7 @@
     registerCard("docker-combined-card", DockerCombinedCard, {
       id: "docker",
       name: "Docker Combined",
-      description: "Docker overview with expandable projects and containers.",
+      description: "Docker projects and containers.",
       editor: {
         schema: [
           { name: "entity_prefix", selector: { text: {} } },

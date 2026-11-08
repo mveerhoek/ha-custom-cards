@@ -671,7 +671,7 @@ ha-card {
 /* Tekst naast het hoofdicoon: 8px naar rechts, zodat de badges (die verder uitsteken, zie
    --cc-badge-offset) dezelfde ruimte tot de tekst houden als voorheen */
 .entry-head > .entry-info {
-  margin-left: 8px;
+  margin-left: 2px;
 }
 
 .entry-name {

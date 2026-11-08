@@ -580,14 +580,14 @@ The card header shows three things:
     includes **Other** when it has containers.
 -   A second line with the total CPU and RAM usage of all running containers,
     in the same format as the Custom Desktop Card (`CPU 1.2 % · RAM 1234 MB`).
--   A status badge: all active, *x of y active*, all stopped or no
-    containers found.
+-   A status badge: *All running*, *x/y running*, *All stopped* or *No
+    containers found*.
 
 Click the header to show or hide the projects. Each project shows its name
-and a status badge (all active, *x of y active* or all stopped) on the first
+and a status badge (*All running*, *x/y running* or *All stopped*) on the first
 line, and its total CPU, RAM, Rx and Tx on the second line. Click a project to
 show or hide its containers. Each container row shows an icon, the name, CPU,
-RAM, the status (active, stopped or unknown) and an on/off toggle.
+RAM, the status (running, stopped or unknown) and an on/off toggle.
 
 Containers can be started and stopped directly from the card using the
 toggle. A confirmation is always requested first.
@@ -601,8 +601,26 @@ Dutch are included in `dist/custom-cards-translations/`. English is the fallback
 for missing files and keys; a regional language file overrides its base language,
 which overrides English. Add a `<language>.json` file in that directory to add a
 language. Preserve keys, placeholders such as `{name}` and plural suffixes such
-as `_one` and `_other`. Configured names, entity values and custom confirmation
-messages remain as supplied by the user or Home Assistant.
+as `_one` and `_other`.
+
+All text shown in the interface comes from these files: labels, status
+texts, confirmation questions, error messages, the card picker texts, the
+visual editor and the accessibility labels (`aria-label`) of buttons and
+sliders. Keys are grouped by prefix (`status.`, `label.`, `docker.`,
+`rows.`, `error.`, `editor.`, `card.`); every key must exist in `en.json`,
+other language files may leave out keys. Configured names, entity
+values and custom confirmation messages remain as supplied by the user or
+Home Assistant. Symbols and units (`·`, `—`, `%`, `°C`, `W`, `kWh`, `m³`)
+are not translated.
+
+## Visual editor
+
+Every card has a visual editor. Single options such as entities and names are
+form fields; lists (`networks`, `devices`, `volumes`, `projects` and `entries`)
+are edited as YAML in an object field. A list must start with a dash (`- `);
+otherwise a warning is shown and the change is not applied. Where available,
+the editor also contains an example of the lists in YAML. Editor labels and
+help texts are translated like the rest of the interface.
 
 ## General information
 
