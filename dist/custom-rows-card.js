@@ -146,8 +146,10 @@
             }
 
             // sensors: een lijst met entiteiten (entities) in plaats van één entity. Een item is een
-            // entity_id of een object { entity, icon, hide_icon, label }; meer dan MAX_SENSORS
-            // items worden genegeerd
+            // entity_id of een object { entity, icon, icon_off, color, hide_icon, label }; meer dan
+            // MAX_SENSORS items worden genegeerd. Bij een binary_sensor toont het item alleen het label
+            // (niet de status); icon geldt dan voor "on" en icon_off voor "off", en de kleur wordt
+            // alleen getoond zolang de sensor aan staat.
             if (extra.type === "sensors") {
               const entities = (Array.isArray(extra.entities) ? extra.entities : [])
                 .map((item) => (typeof item === "string" ? { entity: item } : item))
@@ -155,7 +157,9 @@
                 .slice(0, MAX_SENSORS)
                 .map((item) => ({
                   entity: item.entity,
-                  icon: typeof item.icon === "string" && item.icon ? item.icon : undefined, // optioneel: vervangt het nummericoon
+                  icon: typeof item.icon === "string" && item.icon ? item.icon : undefined, // optioneel: vervangt het nummericoon (bij een binary_sensor: icoon voor "on")
+                  iconOff: typeof item.icon_off === "string" && item.icon_off ? item.icon_off : undefined, // optioneel, alleen binary_sensor: icoon voor "off" (standaard gelijk aan icon)
+                  color: typeof item.color === "string" && item.color.trim() ? item.color.trim() : undefined, // optioneel: kleur van het icoon (bij een binary_sensor alleen bij "on")
                   hideIcon: item.hide_icon === true, // optioneel: toont geen icoon
                   label: item.label !== undefined && item.label !== null && item.label !== "" ? String(item.label) : undefined // optioneel: label (normaal)
                 }));
@@ -1541,13 +1545,19 @@
         const right = document.createElement("div");
         right.className = "extra-right";
 
-        const items = extra.entities.map(({ entity, icon: iconOverride, hideIcon, label }, index) => {
+        const items = extra.entities.map(({ entity, icon: iconOverride, iconOff, color, hideIcon, label }, index) => {
           const item = document.createElement("span");
+          const isBinary = entity.startsWith("binary_sensor.");
+          const defaultIcon = iconOverride || `mdi:numeric-${index + 1}-box`;
+          let itemIcon = null;
+
           item.className = "sensor-item";
 
           if (!hideIcon) {
-            const itemIcon = document.createElement("ha-icon");
-            itemIcon.icon = iconOverride || `mdi:numeric-${index + 1}-box`;
+            itemIcon = document.createElement("ha-icon");
+            itemIcon.icon = defaultIcon;
+            // Een gewone sensor heeft altijd de geconfigureerde kleur; een binary sensor pas bij "on"
+            if (color && !isBinary) itemIcon.style.color = color;
             item.append(itemIcon);
           }
 
@@ -1564,7 +1574,7 @@
           this._makeClickable(item, entity);
           right.append(item);
 
-          return { entityId: entity, item, value };
+          return { entityId: entity, item, value, itemIcon, isBinary, iconOn: defaultIcon, iconOff: iconOff || defaultIcon, color };
         });
 
         if (rowLabel) view.append(iconWrap, rowLabel, right);
@@ -1572,10 +1582,27 @@
         el.append(view);
 
         const update = () => {
-          items.forEach(({ entityId, item, value }) => {
-            const text = this._formatEntity(entityId);
+          items.forEach(({ entityId, item, value, itemIcon, isBinary, iconOn, iconOff, color }) => {
+            const state = this._getState(entityId);
+
+            // Binary sensor: alleen het label tonen, geen status
+            const text = isBinary ? "" : this._formatEntity(entityId);
 
             if (value.textContent !== text) value.textContent = text;
+            value.hidden = isBinary;
+
+            if (isBinary && itemIcon) {
+              const isOn = state?.state === "on";
+              const name = isOn ? iconOn : iconOff;
+
+              if (itemIcon.icon !== name) itemIcon.icon = name;
+
+              // Uit (of onbekend): standaard grijs; de kleur alleen bij aan
+              if (isOn && color) itemIcon.style.color = color;
+              else itemIcon.style.removeProperty("color");
+
+              itemIcon.style.opacity = isAvailable(state) ? "" : "0.5";
+            }
 
             const title = this._getState(entityId)?.attributes?.friendly_name;
 
