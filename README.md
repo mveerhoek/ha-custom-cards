@@ -311,28 +311,38 @@ summary; clicking a displayed value opens its entity details.
 | Entry option | Required | Description |
 | :--- | :--- | :--- |
 | `name`, `icon` | Yes | Display name and Material Design icon, e.g. `mdi:sofa` |
-| `switch` | No | Switch or light toggled by clicking the entry icon |
+| `switch` | No | Switch, light or `input_select` toggled by clicking the entry icon (an `input_select` selects its next option on each click) |
+| `state_colors` | No | Only with an `input_select` as `switch`: list of `{ state, color }` items. The icon takes the colour of the current option and the circle behind it a lighter shade of it; options without an item keep the default grey icon |
 | `temperature`, `humidity`, `illuminance`, `pressure`, `power` | No | Sensor entities shown in that order |
 | `value_order` | No | Order of sensor values for this entry; omitted values follow in the default order |
-| `door` | No | Binary sensor: on/off displays an open/closed door badge |
+| `door` | No | Binary sensor: on shows an orange open-door badge, off a green closed-door badge |
 | `extras` | No | List of expandable controls |
 
 Each extra requires `type` and `entity` (except `sensors` and `consumption`,
 which use `entities` and separate sensor options). `name` and `icon` override the entity name and icon. Supported types:
 
-- `media_player`: opens more-info from the icon; includes play/pause, volume,
-  mute and album artwork when available.
+- `media_player`: the button on the left opens more-info; it shows the album
+  artwork (or other graphic offered by the player) and falls back to the icon
+  when there is none. The first line (bold) shows the title of the track (or the
+  player name), the second line the artist, otherwise the source (e.g.
+  `NPO Radio 2`), otherwise the state. On the right are a play/pause button and
+  a volume button; the volume button replaces the player with a slider with a
+  mute button on the left and a cancel button on the right. Optionally set
+  `badge` (see [Badges](#badges)) to show a badge on the entry icon while the
+  player is playing.
 - `climate`: shows status and target temperature with plus/minus buttons;
   `step` sets the increment (default `0.5`). Long-press the extra to turn it on
   or off. A light-blue circle grows while pressing and briefly lights up when
   the action is triggered after 0.5 seconds. Releasing early, moving or
   scrolling cancels it; buttons do not trigger the long press. A heating or
-  cooling badge may appear on the entry icon.
+  cooling badge appears on the entry icon (see [Badges](#badges)).
 - `power_switch`: shows the switch state, optionally a `power` sensor and
   `status` binary sensor. Set `switchable: true` to enable control. Turning off
   a switch while its `status` sensor is on requires an inline confirmation;
   the prompt closes after five seconds. The name is bold only while the `status`
-  binary sensor is on; otherwise it is shown in regular weight.
+  binary sensor is on; otherwise it is shown in regular weight. Optionally set
+  `badge` (see [Badges](#badges)) to show a badge on the entry icon while the
+  switch is on.
 - `cover`: controls a cover (e.g. sunscreen or blinds). The button on the left
   (`mdi:window-open`) toggles between open and closed. Next to it the name is
   shown in bold, with the state and, when the cover reports a position, how far
@@ -375,9 +385,11 @@ which use `entities` and separate sensor options). `name` and `icon` override th
   | Item option | Description |
   | :--- | :--- |
   | `entity` | Entity ID (required) |
-  | `icon` | Optional icon that replaces the default `mdi:numeric-n-box` icon (`n` = 1-8, the position in the list) |
+  | `icon` | Optional icon that replaces the default `mdi:numeric-n-box` icon (`n` = 1-8, the position in the list). For a binary sensor this is the icon for `on` |
+  | `icon_off` | Optional, binary sensors only: icon for `off` (default: the same as `icon`) |
+  | `color` | Optional colour of the icon. For a binary sensor the colour is only shown while the sensor is `on`; when `off` the icon stays dark grey |
   | `hide_icon` | Set to `true` to show no icon for this item |
-  | `label` | Optional label in regular weight, shown to the right of the icon and before the value |
+  | `label` | Optional label in regular weight, shown to the right of the icon and before the value. For a binary sensor only the label is shown, not the state |
 
 - `consumption`: a compact row for energy, gas and water usage. It takes the
   options `energy_import`, `energy_export`, `gas` and `water` (all optional, at
@@ -403,6 +415,9 @@ entries:
     extras:
       - type: media_player
         entity: media_player.living_room
+        badge:
+          icon: mdi:music-note
+          color: "#2196f3"
       - type: climate
         entity: climate.living_room
         step: 0.5
@@ -411,6 +426,9 @@ entries:
         power: sensor.television_power
         status: binary_sensor.television_active
         switchable: true
+        badge:
+          icon: mdi:television
+          color: orange
       - type: cover
         entity: cover.living_room_sunscreen
         name: Sunscreen
@@ -436,6 +454,20 @@ entries:
         water: sensor.water_consumption_today
 ```
 
+An entry whose `switch` is an `input_select` can give every option its own colour:
+
+```yaml
+entries:
+  - name: Scene
+    icon: mdi:palette
+    switch: input_select.living_room_scene
+    state_colors:
+      - state: Relax
+        color: "#ff9800"
+      - state: Movie
+        color: "#3f51b5"
+```
+
 `value_order` is set per entry and accepts `temperature`, `humidity`,
 `illuminance`, `pressure` and `power` once each. Leave it out for the default
 order shown above. A partial list puts those values first and appends the other
@@ -443,17 +475,42 @@ configured values in default order. Unconfigured sensors are not displayed.
 
 The card also supports `css_url` for an alternative shared stylesheet.
 
+### Badges
+
+Badges are small status icons shown in a corner of the entry icon: a coloured
+circle with a white icon. An entry shows at most three badges, all on the right
+side. They are filled in this order: top right, bottom right, middle right (with
+three badges they overlap slightly). Badges are ordered as follows: climate,
+door, then the `power_switch` and `media_player` badges in the order of the
+extras.
+
+| Badge | Shown when | Icon / colour |
+| :--- | :--- | :--- |
+| Climate (automatic for a `climate` extra) | The climate is heating or cooling | `mdi:heat-wave` in red when heating, `mdi:snowflake` in blue when cooling |
+| Door (`door` option of the entry) | The binary sensor is available | `mdi:door-open` in orange when on (open), `mdi:door` in green when off (closed) |
+| `power_switch` with `badge` | The switch is on | Configured icon and colour |
+| `media_player` with `badge` | The player is playing | Configured icon and colour |
+
+The `badge` option of a `power_switch` or `media_player` extra is optional; without
+it no badge is shown. It has the following options:
+
+| Option | Default | Description |
+| :--- | :--- | :--- |
+| `icon` | `mdi:flash` (`power_switch`), `mdi:play` (`media_player`) | Icon of the badge, e.g. `mdi:music-note` |
+| `color` | `var(--primary-color)` | Colour of the circle: any CSS colour (`orange`, `#2196f3`) or Home Assistant variable. The icon itself is always white |
+
 ------------------------------------------------------------------------
 
 ## 5. Docker Combined Card
 
 Displays Docker containers grouped by project, including CPU, memory and
-network usage. Overview totals include running containers only; unavailable
-values contribute zero to totals.
+network usage. Overview totals include running containers only; stopped or
+unavailable containers contribute zero to totals.
 
 The card automatically discovers containers based on their switch
-entities. Containers that are not assigned to a configured project are
-automatically grouped under **Other**.
+entities (sorted alphabetically). Containers that are not assigned to a
+configured project are automatically grouped under a virtual project
+**Other**, which is hidden when it has no containers.
 
 ### Configuration options
 
@@ -469,9 +526,12 @@ Each project supports:
 | :--- | :--- | :--- |
 | `name` | Yes\* | Displayed project name |
 | `project` | Yes\* | Alternative to `name` |
-| `containers` | Yes | List of container names |
+| `containers` | Yes | List of container names (at least one), without the entity prefix |
 
 \*Provide either `name` or `project` for each project.
+
+A container listed in a project is always shown, even if its entities do not
+exist; its status is then shown as unknown.
 
 ### Expected entities
 
@@ -514,12 +574,23 @@ projects:
       - bookstack
 ```
 
-The card displays an overview of all discovered containers, including
-the number of running containers and total CPU and memory usage.
+The card header shows three things:
 
-The project list and individual container rows can be expanded and
-collapsed. Containers can be started and stopped directly from the card.
-Confirmation is requested by default.
+-   A subtitle such as *12 containers in 4 projects*. The number of projects
+    includes **Other** when it has containers.
+-   A second line with the total CPU and RAM usage of all running containers,
+    in the same format as the Custom Desktop Card (`CPU 1.2 % · RAM 1234 MB`).
+-   A status badge: all active, *x of y active*, all stopped or no
+    containers found.
+
+Click the header to show or hide the projects. Each project shows its name
+and a status badge (all active, *x of y active* or all stopped) on the first
+line, and its total CPU, RAM, Rx and Tx on the second line. Click a project to
+show or hide its containers. Each container row shows an icon, the name, CPU,
+RAM, the status (active, stopped or unknown) and an on/off toggle.
+
+Containers can be started and stopped directly from the card using the
+toggle. A confirmation is always requested first.
 
 ------------------------------------------------------------------------
 
