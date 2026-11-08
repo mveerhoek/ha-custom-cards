@@ -70,9 +70,12 @@
     };
 
     // Badges: klein statusicoon in een hoek van het hoofdicoon. Van de getoonde badges staat
-    // de eerste rechtsboven en de tweede rechtsonder (volgorde van de lijst hieronder).
-    // resolve geeft { icon, tone } als de badge getoond moet worden, anders null.
-    const BADGE_SLOTS = ["top-right", "bottom-right"];
+    // de eerste rechtsboven, de tweede rechtsonder en de derde rechtsmidden (maximaal 3 badges,
+    // alle aan de rechterkant; bij 3 badges overlappen ze elkaar een klein beetje)
+    // (volgorde: climate, deur, daarna de power_switch badges in de volgorde van de extras).
+    // resolve geeft { icon, tone, color? } als de badge getoond moet worden, anders null.
+    // tone "custom" gebruikt de meegegeven color als achtergrondcirkel.
+    const BADGE_SLOTS = ["top-right", "bottom-right", "middle-right"];
 
     const BADGES = [
       {
@@ -104,6 +107,32 @@
         }
       }
     ];
+
+    // Alle badges van een regel: de vaste badges (climate, deur) plus een badge per power_switch
+    // met een badge-configuratie. Een badge is alleen zichtbaar als de schakelaar aan staat.
+    const badgeDefs = (entry) => [
+      ...BADGES.filter((def) => def.applies(entry)),
+      ...entry.extras
+        .filter((extra) => extra.type === "power_switch" && extra.badge)
+        .map((extra) => ({
+          resolve: (card) => {
+            const state = card._getState(extra.entity);
+
+            return state?.state === "on"
+              ? { icon: extra.badge.icon, tone: "custom", color: extra.badge.color }
+              : null;
+          }
+        }))
+    ];
+
+    // power_switch badge: optioneel object { icon, color }; zonder badge geen badge
+    const parseBadge = (badge) =>
+      badge && typeof badge === "object" && !Array.isArray(badge)
+        ? {
+          icon: typeof badge.icon === "string" && badge.icon ? badge.icon : "mdi:flash",
+          color: typeof badge.color === "string" && badge.color.trim() ? badge.color.trim() : "var(--primary-color)"
+        }
+        : undefined;
 
     const toNumber = (value) =>
       value === null || value === undefined || value === "" || !Number.isFinite(Number(value))
@@ -208,7 +237,8 @@
               step: Number(extra.step) > 0 ? Number(extra.step) : DEFAULT_STEP, // alleen climate
               power: extra.power, // alleen power_switch: vermogenssensor (optioneel)
               status: extra.status, // alleen power_switch: binary_sensor (optioneel)
-              switchable: extra.switchable === true // alleen power_switch: schakelbaar vanuit de kaart
+              switchable: extra.switchable === true, // alleen power_switch: schakelbaar vanuit de kaart
+              badge: extra.type === "power_switch" ? parseBadge(extra.badge) : undefined // alleen power_switch: optionele badge { icon, color }, getoond als de schakelaar aan staat
             };
           });
 
@@ -305,7 +335,7 @@
           iconWrap.append(icon);
 
           // Badges in de hoeken van het icoon (alleen als die voor deze regel van toepassing zijn)
-          const badges = BADGES.filter((def) => def.applies(entry)).map((def) => {
+          const badges = badgeDefs(entry).map((def) => {
             const badge = document.createElement("span");
             badge.className = "entry-badge";
             badge.hidden = true;
@@ -1940,6 +1970,8 @@
 
             if (icon.icon !== result.icon) icon.icon = result.icon;
             el.dataset.tone = result.tone;
+            if (result.color) el.style.setProperty("--cc-badge-color", result.color);
+            else el.style.removeProperty("--cc-badge-color");
             el.dataset.slot = BADGE_SLOTS[shown];
             shown++;
           });

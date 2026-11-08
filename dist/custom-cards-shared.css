@@ -717,7 +717,7 @@ ha-card {
 }
 
 /* Badges: klein statusicoon in een hoek van het hoofdicoon. Eerste badge rechtsboven,
-   tweede rechtsonder. Niet klikbaar: een klik valt door naar het icoon (schakelaar). */
+   tweede rechtsonder, derde rechtsmidden (max. 3). Niet klikbaar: een klik valt door naar het icoon (schakelaar). */
 .entry-badge {
   position: absolute;
   display: flex;
@@ -746,6 +746,13 @@ ha-card {
   right: -4px;
 }
 
+/* Derde badge: halverwege tussen de eerste twee; overlapt die een klein beetje */
+.entry-badge[data-slot="middle-right"] {
+  top: 50%;
+  right: -4px;
+  transform: translateY(-50%);
+}
+
 .entry-badge[data-tone="heat"] {
   background: var(--cc-heat-color);
 }
@@ -760,6 +767,11 @@ ha-card {
 
 .entry-badge[data-tone="door-closed"] {
   background: var(--cc-door-closed-color);
+}
+
+/* power_switch badge: de kleur komt uit de configuratie (--cc-badge-color, via JS gezet) */
+.entry-badge[data-tone="custom"] {
+  background: var(--cc-badge-color, var(--primary-color));
 }
 
 .entry-icon.switchable {
