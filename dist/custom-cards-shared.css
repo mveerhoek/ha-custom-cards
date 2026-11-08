@@ -668,6 +668,12 @@ ha-card {
   min-width: 0;
 }
 
+/* Tekst naast het hoofdicoon: 8px naar rechts, zodat de badges (die verder uitsteken, zie
+   --cc-badge-offset) dezelfde ruimte tot de tekst houden als voorheen */
+.entry-head > .entry-info {
+  margin-left: 8px;
+}
+
 .entry-name {
   width: fit-content;
   max-width: 100%;
@@ -716,6 +722,13 @@ ha-card {
   transition: background 0.15s, color 0.15s;
 }
 
+/* Badges staan rechts van het icoon zelf (de 20px glyph, niet de 32px cirkel eromheen):
+   de glyph eindigt 26px van de linkerrand van de cirkel, de badge (16px) begint 2px verder
+   (op 28px) en eindigt dus op 44px, 12px voorbij de cirkel van 32px. */
+.entry-icon {
+  --cc-badge-offset: -12px;
+}
+
 /* Badges: klein statusicoon in een hoek van het hoofdicoon. Eerste badge rechtsboven,
    tweede rechtsonder, derde rechtsmidden (max. 3). Niet klikbaar: een klik valt door naar het icoon (schakelaar). */
 .entry-badge {
@@ -738,18 +751,18 @@ ha-card {
 
 .entry-badge[data-slot="top-right"] {
   top: -4px;
-  right: -4px;
+  right: var(--cc-badge-offset);
 }
 
 .entry-badge[data-slot="bottom-right"] {
   bottom: -4px;
-  right: -4px;
+  right: var(--cc-badge-offset);
 }
 
 /* Derde badge: halverwege tussen de eerste twee; overlapt die een klein beetje */
 .entry-badge[data-slot="middle-right"] {
   top: 50%;
-  right: -4px;
+  right: var(--cc-badge-offset);
   transform: translateY(-50%);
 }
 
