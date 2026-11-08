@@ -584,6 +584,8 @@ ha-card {
   --cc-door-closed-color: var(--success-color, #4caf50); /* deurbadge: deur dicht (groen) */
   --cc-power-on-color: var(--success-color, #4caf50); /* stroomschakelaar: aan */
   --cc-power-status-color: #8bc34a;                    /* stroomschakelaar: binary sensor aan (light green) */
+  --cc-state-circle-opacity: 20%;       /* input_select: dekking van de cirkel (kleur van het icoon) */
+  --cc-state-circle-hover-opacity: 32%; /* idem, bij hover met de muis */
 }
 
 /* Regels onder elkaar; de kaart zet het aantal kolommen (1, 2 of 4) en de kolomafstand.
@@ -778,6 +780,13 @@ ha-card {
   background: color-mix(in srgb, var(--cc-switch-color) 20%, transparent);
 }
 
+/* input_select met state_colors: icoon in de kleur van de huidige status (--cc-state-color,
+   door de kaart per regel gezet); de cirkel is dezelfde kleur met lage dekking */
+.entry-icon.switchable.has-state-color {
+  color: var(--cc-state-color);
+  background: color-mix(in srgb, var(--cc-state-color) var(--cc-state-circle-opacity), transparent);
+}
+
 .entry-icon.switchable.unavailable {
   opacity: 0.5;
   cursor: default;
@@ -793,6 +802,11 @@ ha-card {
   .entry-icon.switchable.on:not(.unavailable):hover {
     color: var(--cc-switch-color);
     background: color-mix(in srgb, var(--cc-switch-color) 32%, transparent);
+  }
+
+  .entry-icon.switchable.has-state-color:not(.unavailable):hover {
+    color: var(--cc-state-color);
+    background: color-mix(in srgb, var(--cc-state-color) var(--cc-state-circle-hover-opacity), transparent);
   }
 }
 
