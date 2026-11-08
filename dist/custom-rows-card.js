@@ -46,11 +46,8 @@
       off: "mdi:power"
     };
 
-    // Labels (aria) van het cover-element; de rest van de kaart gebruikt de vertalingen uit custom-cards-shared.js
-    const COVER_LABELS = {
-      en: { toggle: "Open or close", close: "Close", open: "Open", slider: "Set position", position: "Position", back: "Back", color: "Choose colour", brightness: "Brightness" },
-      nl: { toggle: "Openen of sluiten", close: "Sluiten", open: "Openen", slider: "Positie instellen", position: "Positie", back: "Terug", color: "Kleur kiezen", brightness: "Helderheid" }
-    };
+    // Weergave van een ontbrekende of onbeschikbare waarde (een symbool, geen tekst)
+    const NO_VALUE = "—";
 
     const isAvailable = (state) =>
       !!state && state.state !== "unavailable" && state.state !== "unknown";
@@ -1009,7 +1006,7 @@
           const title = attrs.media_title;
           const artist = attrs.media_artist;
           const source = attrs.source;
-          const stateText = state ? this._stateText(state) : "—";
+          const stateText = state ? this._stateText(state) : NO_VALUE;
 
           const top = title || extra.name || attrs.friendly_name || extra.entity;
           const bottom = (title && artist) || source || stateText;
@@ -1156,7 +1153,7 @@
           const available = isAvailable(state);
 
           name.textContent = extra.name || attrs.friendly_name || extra.entity;
-          status.textContent = state ? this._stateText(state) : "—";
+          status.textContent = state ? this._stateText(state) : NO_VALUE;
 
           info.el.setAttribute("aria-label", this._t("rows.more_info", { name: name.textContent }));
           minus.el.setAttribute("aria-label", this._t("rows.decrease_temperature"));
@@ -1172,7 +1169,7 @@
           const current = control.pending ?? toNumber(attrs.temperature);
           const unit = this._hass?.config?.unit_system?.temperature || "°C";
 
-          value.textContent = current === null ? "—" : `${this._formatNumber1(current)} ${unit}`;
+          value.textContent = current === null ? NO_VALUE : `${this._formatNumber1(current)} ${unit}`;
 
           const min = toNumber(attrs.min_temp);
           const max = toNumber(attrs.max_temp);
@@ -1195,12 +1192,6 @@
       }
 
       // ----- Extra element: cover (zonwering) -----
-
-      _coverLabel(key) {
-        const lang = String(this._language || "en").slice(0, 2).toLowerCase();
-
-        return (COVER_LABELS[lang] || COVER_LABELS.en)[key];
-      }
 
       // Hoofdweergave: [open/dicht] | naam boven status + percentage | [omlaag] [omhoog] [slider]
       // Sliderweergave: slider over de volle breedte | [terug]
@@ -1310,7 +1301,7 @@
           name.title = title;
 
           // Status (open, dicht, ...) en daarachter hoe ver de cover open is
-          let text = state ? this._stateText(state) : "—";
+          let text = state ? this._stateText(state) : NO_VALUE;
           if (available && position !== null) text += ` · ${Math.round(position)}%`;
 
           status.textContent = text;
@@ -1326,12 +1317,12 @@
           swipe.el.disabled = !available || position === null;
           slider.disabled = !available || position === null;
 
-          info.el.setAttribute("aria-label", `${this._coverLabel("toggle")}: ${title}`);
-          close.el.setAttribute("aria-label", this._coverLabel("close"));
-          open.el.setAttribute("aria-label", this._coverLabel("open"));
-          swipe.el.setAttribute("aria-label", this._coverLabel("slider"));
-          slider.setAttribute("aria-label", this._coverLabel("position"));
-          back.el.setAttribute("aria-label", this._coverLabel("back"));
+          info.el.setAttribute("aria-label", `${this._t("rows.cover_toggle")}: ${title}`);
+          close.el.setAttribute("aria-label", this._t("rows.cover_close"));
+          open.el.setAttribute("aria-label", this._t("rows.cover_open"));
+          swipe.el.setAttribute("aria-label", this._t("rows.cover_slider"));
+          slider.setAttribute("aria-label", this._t("rows.position"));
+          back.el.setAttribute("aria-label", this._t("rows.back"));
 
           const holding = control.target !== null && (moving || Date.now() < control.holdUntil);
 
@@ -1515,10 +1506,10 @@
           dim.el.disabled = !available;
           slider.disabled = !available;
 
-          color.el.setAttribute("aria-label", this._coverLabel("color"));
-          dim.el.setAttribute("aria-label", this._coverLabel("brightness"));
-          slider.setAttribute("aria-label", this._coverLabel("brightness"));
-          back.el.setAttribute("aria-label", this._coverLabel("back"));
+          color.el.setAttribute("aria-label", this._t("rows.color"));
+          dim.el.setAttribute("aria-label", this._t("rows.brightness"));
+          slider.setAttribute("aria-label", this._t("rows.brightness"));
+          back.el.setAttribute("aria-label", this._t("rows.back"));
 
           // Helderheid in procenten (uit = 0)
           const brightness = Number(attrs.brightness);
@@ -1531,7 +1522,7 @@
 
           intensity.hidden = !canDim;
 
-          const intensityText = available ? `${level}%` : "—";
+          const intensityText = available ? `${level}%` : NO_VALUE;
 
           intensity.textContent = intensityText;
           intensity.title = intensityText;
@@ -1542,7 +1533,7 @@
 
           toggle.classList.toggle("on", isOn);
           toggle.classList.toggle("unavailable", !available);
-          toggle.title = state ? this._stateText(state) : "—";
+          toggle.title = state ? this._stateText(state) : NO_VALUE;
           toggle.setAttribute("aria-checked", String(isOn));
           toggle.setAttribute("aria-label", text);
         };
@@ -1876,7 +1867,7 @@
 
             statusWrap.classList.toggle("on", status?.state === "on");
             statusWrap.classList.toggle("unavailable", !status || status.state === "unavailable");
-            statusWrap.title = status ? this._stateText(status) : "—";
+            statusWrap.title = status ? this._stateText(status) : NO_VALUE;
           }
 
           const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
@@ -1885,7 +1876,7 @@
 
           toggle.classList.toggle("on", isOn);
           toggle.classList.toggle("unavailable", !state || state.state === "unavailable");
-          toggle.title = state ? this._stateText(state) : "—";
+          toggle.title = state ? this._stateText(state) : NO_VALUE;
 
           if (extra.switchable) {
             toggle.setAttribute("aria-checked", String(isOn));
@@ -1901,7 +1892,7 @@
       _formatValue(entityId, decimals, fallbackUnit) {
         const value = this._getNumber(entityId);
 
-        if (value === null) return "—";
+        if (value === null) return NO_VALUE;
 
         const unit = this._getUnit(entityId, fallbackUnit);
         let text;
@@ -1923,7 +1914,7 @@
       _formatEntity(entityId) {
         const state = this._getState(entityId);
 
-        if (!state || state.state === "unavailable" || state.state === "unknown") return "—";
+        if (!state || state.state === "unavailable" || state.state === "unknown") return NO_VALUE;
 
         if (this._hass?.formatEntityState) return this._hass.formatEntityState(state);
 
@@ -2009,7 +2000,7 @@
     registerCard("custom-rows-card", CustomRowsCard, {
       id: "rows",
       name: "Custom Rows Card",
-      description: "One row per entry: icon, name, optional switch/light, sensor values and expandable media player / climate / cover / light / power switch / sensors / consumption elements.",
+      description: "Rows with sensors, switches and media, climate and power controls.",
       editor: {
         schema: [
           { name: "entries", selector: { object: {} } },
@@ -2017,7 +2008,7 @@
         ]
       },
       stubConfig: {
-        entries: [{ name: "Woonkamer", icon: "mdi:sofa" }]
+        entries: [{ name: "Living room", icon: "mdi:sofa" }] // vervangen door card.rows.default_name
       }
     });
   };
