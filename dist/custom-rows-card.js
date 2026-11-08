@@ -70,9 +70,12 @@
     };
 
     // Badges: klein statusicoon in een hoek van het hoofdicoon. Van de getoonde badges staat
-    // de eerste rechtsboven en de tweede rechtsonder (volgorde van de lijst hieronder).
-    // resolve geeft { icon, tone } als de badge getoond moet worden, anders null.
-    const BADGE_SLOTS = ["top-right", "bottom-right"];
+    // de eerste rechtsboven, de tweede rechtsonder en de derde rechtsmidden (maximaal 3 badges,
+    // alle aan de rechterkant; bij 3 badges overlappen ze elkaar een klein beetje)
+    // (volgorde: climate, deur, daarna de power_switch badges in de volgorde van de extras).
+    // resolve geeft { icon, tone, color? } als de badge getoond moet worden, anders null.
+    // tone "custom" gebruikt de meegegeven color als achtergrondcirkel.
+    const BADGE_SLOTS = ["top-right", "bottom-right", "middle-right"];
 
     const BADGES = [
       {
@@ -104,6 +107,32 @@
         }
       }
     ];
+
+    // Alle badges van een regel: de vaste badges (climate, deur) plus een badge per power_switch
+    // met een badge-configuratie. Een badge is alleen zichtbaar als de schakelaar aan staat.
+    const badgeDefs = (entry) => [
+      ...BADGES.filter((def) => def.applies(entry)),
+      ...entry.extras
+        .filter((extra) => extra.type === "power_switch" && extra.badge)
+        .map((extra) => ({
+          resolve: (card) => {
+            const state = card._getState(extra.entity);
+
+            return state?.state === "on"
+              ? { icon: extra.badge.icon, tone: "custom", color: extra.badge.color }
+              : null;
+          }
+        }))
+    ];
+
+    // power_switch badge: optioneel object { icon, color }; zonder badge geen badge
+    const parseBadge = (badge) =>
+      badge && typeof badge === "object" && !Array.isArray(badge)
+        ? {
+          icon: typeof badge.icon === "string" && badge.icon ? badge.icon : "mdi:flash",
+          color: typeof badge.color === "string" && badge.color.trim() ? badge.color.trim() : "var(--primary-color)"
+        }
+        : undefined;
 
     const toNumber = (value) =>
       value === null || value === undefined || value === "" || !Number.isFinite(Number(value))
@@ -146,8 +175,10 @@
             }
 
             // sensors: een lijst met entiteiten (entities) in plaats van één entity. Een item is een
-            // entity_id of een object { entity, icon, hide_icon, label }; meer dan MAX_SENSORS
-            // items worden genegeerd
+            // entity_id of een object { entity, icon, icon_off, color, hide_icon, label }; meer dan
+            // MAX_SENSORS items worden genegeerd. Bij een binary_sensor toont het item alleen het label
+            // (niet de status); icon geldt dan voor "on" en icon_off voor "off", en de kleur wordt
+            // alleen getoond zolang de sensor aan staat.
             if (extra.type === "sensors") {
               const entities = (Array.isArray(extra.entities) ? extra.entities : [])
                 .map((item) => (typeof item === "string" ? { entity: item } : item))
@@ -155,7 +186,9 @@
                 .slice(0, MAX_SENSORS)
                 .map((item) => ({
                   entity: item.entity,
-                  icon: typeof item.icon === "string" && item.icon ? item.icon : undefined, // optioneel: vervangt het nummericoon
+                  icon: typeof item.icon === "string" && item.icon ? item.icon : undefined, // optioneel: vervangt het nummericoon (bij een binary_sensor: icoon voor "on")
+                  iconOff: typeof item.icon_off === "string" && item.icon_off ? item.icon_off : undefined, // optioneel, alleen binary_sensor: icoon voor "off" (standaard gelijk aan icon)
+                  color: typeof item.color === "string" && item.color.trim() ? item.color.trim() : undefined, // optioneel: kleur van het icoon (bij een binary_sensor alleen bij "on")
                   hideIcon: item.hide_icon === true, // optioneel: toont geen icoon
                   label: item.label !== undefined && item.label !== null && item.label !== "" ? String(item.label) : undefined // optioneel: label (normaal)
                 }));
@@ -204,14 +237,24 @@
               step: Number(extra.step) > 0 ? Number(extra.step) : DEFAULT_STEP, // alleen climate
               power: extra.power, // alleen power_switch: vermogenssensor (optioneel)
               status: extra.status, // alleen power_switch: binary_sensor (optioneel)
-              switchable: extra.switchable === true // alleen power_switch: schakelbaar vanuit de kaart
+              switchable: extra.switchable === true, // alleen power_switch: schakelbaar vanuit de kaart
+              badge: extra.type === "power_switch" ? parseBadge(extra.badge) : undefined // alleen power_switch: optionele badge { icon, color }, getoond als de schakelaar aan staat
             };
           });
+
+          // state_colors (alleen bij een input_select): lijst van { state, color }; een ongeldig
+          // item wordt genegeerd, een status zonder item houdt het standaard (grijze) icoon
+          const stateColors = typeof entry.switch === "string" && entry.switch.startsWith("input_select.") && Array.isArray(entry.state_colors)
+            ? entry.state_colors
+              .filter((item) => item && item.state !== undefined && item.state !== null && typeof item.color === "string" && item.color)
+              .map((item) => ({ state: String(item.state), color: item.color }))
+            : [];
 
           return {
             name: entry.name,
             icon: entry.icon,
-            switch: entry.switch, // optioneel: schakelaar of lamp
+            switch: entry.switch, // optioneel: schakelaar, lamp of input_select (klik = select_next)
+            stateColors, // optioneel, alleen input_select: kleur van icoon en cirkel per status
             temperature: entry.temperature,
             humidity: entry.humidity,
             illuminance: entry.illuminance,
@@ -292,7 +335,7 @@
           iconWrap.append(icon);
 
           // Badges in de hoeken van het icoon (alleen als die voor deze regel van toepassing zijn)
-          const badges = BADGES.filter((def) => def.applies(entry)).map((def) => {
+          const badges = badgeDefs(entry).map((def) => {
             const badge = document.createElement("span");
             badge.className = "entry-badge";
             badge.hidden = true;
@@ -306,13 +349,16 @@
           });
 
           if (entry.switch) {
+            // Een input_select heeft geen aan/uit-status: die gedraagt zich als knop (select_next)
+            const isSelect = entry.switch.startsWith("input_select.");
+
             iconWrap.classList.add("switchable");
-            iconWrap.setAttribute("role", "switch");
+            iconWrap.setAttribute("role", isSelect ? "button" : "switch");
             iconWrap.setAttribute("tabindex", "0");
             iconWrap.setAttribute("aria-label", entry.name);
 
             // stopPropagation: schakelen klapt de regel niet uit
-            this._onActivate(iconWrap, () => this._toggle(entry.switch), { stopPropagation: true });
+            this._onActivate(iconWrap, () => this._activateMain(entry.switch), { stopPropagation: true });
           }
 
           const info = document.createElement("div");
@@ -656,6 +702,36 @@
         if (!this._hass || !state || state.state === "unavailable") return;
 
         this._callService("homeassistant", "toggle", { entity_id: entityId });
+      }
+
+      // Kleur die bij de huidige status van een input_select hoort (exacte status eerst,
+      // daarna zonder hoofdletters/spaties); null als de status niet is geconfigureerd
+      _stateColor(entry, state) {
+        if (!entry.stateColors?.length || !isAvailable(state)) return null;
+
+        const exact = entry.stateColors.find((item) => item.state === state.state);
+
+        if (exact) return exact.color;
+
+        const normalize = (value) => value.trim().toLowerCase();
+        const loose = entry.stateColors.find((item) => normalize(item.state) === normalize(state.state));
+
+        return loose ? loose.color : null;
+      }
+
+      // Klik op het hoofdicoon: een input_select gaat naar de volgende optie
+      // (input_select.select_next, daarna weer de eerste); alles anders wordt aan/uit gezet
+      _activateMain(entityId) {
+        if (!entityId.startsWith("input_select.")) {
+          this._toggle(entityId);
+          return;
+        }
+
+        const state = this._getState(entityId);
+
+        if (!this._hass || !state || state.state === "unavailable") return;
+
+        this._callService("input_select", "select_next", { entity_id: entityId, cycle: true });
       }
 
       async _callService(domain, service, data) {
@@ -1499,13 +1575,19 @@
         const right = document.createElement("div");
         right.className = "extra-right";
 
-        const items = extra.entities.map(({ entity, icon: iconOverride, hideIcon, label }, index) => {
+        const items = extra.entities.map(({ entity, icon: iconOverride, iconOff, color, hideIcon, label }, index) => {
           const item = document.createElement("span");
+          const isBinary = entity.startsWith("binary_sensor.");
+          const defaultIcon = iconOverride || `mdi:numeric-${index + 1}-box`;
+          let itemIcon = null;
+
           item.className = "sensor-item";
 
           if (!hideIcon) {
-            const itemIcon = document.createElement("ha-icon");
-            itemIcon.icon = iconOverride || `mdi:numeric-${index + 1}-box`;
+            itemIcon = document.createElement("ha-icon");
+            itemIcon.icon = defaultIcon;
+            // Een gewone sensor heeft altijd de geconfigureerde kleur; een binary sensor pas bij "on"
+            if (color && !isBinary) itemIcon.style.color = color;
             item.append(itemIcon);
           }
 
@@ -1522,7 +1604,7 @@
           this._makeClickable(item, entity);
           right.append(item);
 
-          return { entityId: entity, item, value };
+          return { entityId: entity, item, value, itemIcon, isBinary, iconOn: defaultIcon, iconOff: iconOff || defaultIcon, color };
         });
 
         if (rowLabel) view.append(iconWrap, rowLabel, right);
@@ -1530,10 +1612,27 @@
         el.append(view);
 
         const update = () => {
-          items.forEach(({ entityId, item, value }) => {
-            const text = this._formatEntity(entityId);
+          items.forEach(({ entityId, item, value, itemIcon, isBinary, iconOn, iconOff, color }) => {
+            const state = this._getState(entityId);
+
+            // Binary sensor: alleen het label tonen, geen status
+            const text = isBinary ? "" : this._formatEntity(entityId);
 
             if (value.textContent !== text) value.textContent = text;
+            value.hidden = isBinary;
+
+            if (isBinary && itemIcon) {
+              const isOn = state?.state === "on";
+              const name = isOn ? iconOn : iconOff;
+
+              if (itemIcon.icon !== name) itemIcon.icon = name;
+
+              // Uit (of onbekend): standaard grijs; de kleur alleen bij aan
+              if (isOn && color) itemIcon.style.color = color;
+              else itemIcon.style.removeProperty("color");
+
+              itemIcon.style.opacity = isAvailable(state) ? "" : "0.5";
+            }
 
             const title = this._getState(entityId)?.attributes?.friendly_name;
 
@@ -1839,11 +1938,25 @@
         this._rows.forEach(({ entry, iconWrap, values, extras, badges }) => {
           if (entry.switch) {
             const state = this._getState(entry.switch);
-            const isOn = state?.state === "on";
+            const isSelect = entry.switch.startsWith("input_select.");
 
-            iconWrap.classList.toggle("on", isOn);
             iconWrap.classList.toggle("unavailable", !state || state.state === "unavailable");
-            iconWrap.setAttribute("aria-checked", String(isOn));
+
+            if (isSelect) {
+              // Een input_select is een knop: geen aan/uit-status (ook niet bij een optie "on"),
+              // maar een kleur per status
+              const color = this._stateColor(entry, state);
+
+              iconWrap.classList.toggle("has-state-color", !!color);
+
+              if (color) iconWrap.style.setProperty("--cc-state-color", color);
+              else iconWrap.style.removeProperty("--cc-state-color");
+            } else {
+              const isOn = state?.state === "on";
+
+              iconWrap.classList.toggle("on", isOn);
+              iconWrap.setAttribute("aria-checked", String(isOn));
+            }
           }
 
           // Getoonde badges krijgen op volgorde een hoek: eerst rechtsboven, dan rechtsonder
@@ -1857,6 +1970,8 @@
 
             if (icon.icon !== result.icon) icon.icon = result.icon;
             el.dataset.tone = result.tone;
+            if (result.color) el.style.setProperty("--cc-badge-color", result.color);
+            else el.style.removeProperty("--cc-badge-color");
             el.dataset.slot = BADGE_SLOTS[shown];
             shown++;
           });
