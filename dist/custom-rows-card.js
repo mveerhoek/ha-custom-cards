@@ -1705,7 +1705,7 @@
 
       // ----- Extra element: stroomschakelaar -----
 
-      // Compacte rij: icoon | naam (dik) | vermogen | status binary sensor | schakelaar
+      // Compacte rij: icoon | naam (normaal gewicht) | vermogen | status binary sensor | schakelaar
       _buildPowerSwitch(extra) {
         const el = document.createElement("div");
         el.className = "extra extra-power";
@@ -1726,6 +1726,8 @@
 
         const name = document.createElement("div");
         name.className = "entry-name";
+        // Altijd normaal gewicht: de status wordt al getoond met het statusicoon
+        name.style.fontWeight = "400";
         labels.append(name);
 
         const right = document.createElement("div");
@@ -1786,6 +1788,7 @@
 
         const confirmText = document.createElement("div");
         confirmText.className = "entry-name";
+        confirmText.style.fontWeight = "400";
         confirmLabels.append(confirmText);
 
         const confirmNo = this._iconButton(() => showConfirm(false));
@@ -1834,9 +1837,6 @@
 
           name.textContent = text;
           name.title = text;
-
-          // Vet alleen zolang de binary sensor van het apparaat aan staat
-          name.style.fontWeight = extra.status && this._getState(extra.status)?.state === "on" ? "" : "400";
 
           const question = this._t("rows.confirm_off", { name: text });
 
