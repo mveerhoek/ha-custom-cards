@@ -339,8 +339,8 @@ which use `entities` and separate sensor options). `name` and `icon` override th
 - `power_switch`: shows the switch state, optionally a `power` sensor and
   `status` binary sensor. Set `switchable: true` to enable control. Turning off
   a switch while its `status` sensor is on requires an inline confirmation;
-  the prompt closes after five seconds. The name is bold only while the `status`
-  binary sensor is on; otherwise it is shown in regular weight. Optionally set
+  the prompt closes after five seconds. The name is always shown in regular
+  weight; the state is indicated by the status icon. Optionally set
   `badge` (see [Badges](#badges)) to show a badge on the entry icon while the
   switch is on.
 - `cover`: controls a cover (e.g. sunscreen or blinds). The button on the left
