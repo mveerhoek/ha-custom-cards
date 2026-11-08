@@ -726,7 +726,7 @@ ha-card {
    de glyph eindigt 26px van de linkerrand van de cirkel, de badge (16px) begint 2px verder
    (op 28px) en eindigt dus op 44px, 12px voorbij de cirkel van 32px. */
 .entry-icon {
-  --cc-badge-offset: -15px;
+  --cc-badge-offset: -9px;
 }
 
 /* Badges: klein statusicoon in een hoek van het hoofdicoon. Eerste badge rechtsboven,
