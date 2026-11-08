@@ -72,7 +72,7 @@
     // Badges: klein statusicoon in een hoek van het hoofdicoon. Van de getoonde badges staat
     // de eerste rechtsboven, de tweede rechtsonder en de derde rechtsmidden (maximaal 3 badges,
     // alle aan de rechterkant; bij 3 badges overlappen ze elkaar een klein beetje)
-    // (volgorde: climate, deur, daarna de power_switch badges in de volgorde van de extras).
+    // (volgorde: climate, deur, daarna de power_switch en media_player badges in de volgorde van de extras).
     // resolve geeft { icon, tone, color? } als de badge getoond moet worden, anders null.
     // tone "custom" gebruikt de meegegeven color als achtergrondcirkel.
     const BADGE_SLOTS = ["top-right", "bottom-right", "middle-right"];
@@ -108,28 +108,41 @@
       }
     ];
 
-    // Alle badges van een regel: de vaste badges (climate, deur) plus een badge per power_switch
-    // met een badge-configuratie. Een badge is alleen zichtbaar als de schakelaar aan staat.
+    // Extras met een optionele badge en wanneer die getoond wordt:
+    // - power_switch: zolang de schakelaar aan staat
+    // - media_player: zolang de speler afspeelt (state "playing")
+    const BADGE_ACTIVE = {
+      power_switch: (state) => state?.state === "on",
+      media_player: (state) => state?.state === "playing"
+    };
+
+    // Standaard badge-icoon per type, als de configuratie geen icon opgeeft
+    const BADGE_DEFAULT_ICONS = {
+      power_switch: "mdi:flash",
+      media_player: "mdi:play"
+    };
+
+    // Alle badges van een regel: de vaste badges (climate, deur) plus een badge per power_switch of
+    // media_player met een badge-configuratie. Zo'n badge is alleen zichtbaar als het extra actief is
+    // (zie BADGE_ACTIVE).
     const badgeDefs = (entry) => [
       ...BADGES.filter((def) => def.applies(entry)),
       ...entry.extras
-        .filter((extra) => extra.type === "power_switch" && extra.badge)
+        .filter((extra) => BADGE_ACTIVE[extra.type] && extra.badge)
         .map((extra) => ({
-          resolve: (card) => {
-            const state = card._getState(extra.entity);
-
-            return state?.state === "on"
+          resolve: (card) =>
+            BADGE_ACTIVE[extra.type](card._getState(extra.entity))
               ? { icon: extra.badge.icon, tone: "custom", color: extra.badge.color }
-              : null;
-          }
+              : null
         }))
     ];
 
-    // power_switch badge: optioneel object { icon, color }; zonder badge geen badge
-    const parseBadge = (badge) =>
+    // Badge van een extra (power_switch of media_player): optioneel object { icon, color };
+    // zonder badge geen badge. Zonder icon geldt het standaardicoon van het type.
+    const parseBadge = (badge, defaultIcon) =>
       badge && typeof badge === "object" && !Array.isArray(badge)
         ? {
-          icon: typeof badge.icon === "string" && badge.icon ? badge.icon : "mdi:flash",
+          icon: typeof badge.icon === "string" && badge.icon ? badge.icon : defaultIcon,
           color: typeof badge.color === "string" && badge.color.trim() ? badge.color.trim() : "var(--primary-color)"
         }
         : undefined;
@@ -238,7 +251,7 @@
               power: extra.power, // alleen power_switch: vermogenssensor (optioneel)
               status: extra.status, // alleen power_switch: binary_sensor (optioneel)
               switchable: extra.switchable === true, // alleen power_switch: schakelbaar vanuit de kaart
-              badge: extra.type === "power_switch" ? parseBadge(extra.badge) : undefined // alleen power_switch: optionele badge { icon, color }, getoond als de schakelaar aan staat
+              badge: BADGE_ACTIVE[extra.type] ? parseBadge(extra.badge, BADGE_DEFAULT_ICONS[extra.type]) : undefined // alleen power_switch en media_player: optionele badge { icon, color }; power_switch toont hem als de schakelaar aan staat, media_player als de speler afspeelt
             };
           });
 
