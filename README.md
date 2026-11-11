@@ -108,6 +108,35 @@ Each device supports the following options:
 | `cpu` | CPU usage sensor |
 | `memory` | RAM usage sensor |
 | `restart_action` | Optional action for the restart button |
+| `uplink_speed` | Optional entity with the uplink speed. Shows a coloured square left of the restart button; hover to see the speed |
+| `ports` | Optional list of ports, drawn as small squares on a second row below the device name |
+
+### Link speed colours
+
+The uplink square and the port squares use the same colours. The value is read
+from the entity state in Mbit/s (`1000`), or with a unit (`1 Gbps`, `2,5 Gbit/s`,
+or the `unit_of_measurement` attribute). A value that is unknown, unavailable,
+not a number or below 10 Mbit/s is shown as disconnected.
+
+| Speed | Colour |
+| :--- | :--- |
+| 10 Mbit/s | `#D97706` |
+| 100 Mbit/s | `#EAB308` |
+| 1 Gbit/s | `#00A859` |
+| 2.5 Gbit/s | `#00A0DF` |
+| 5 Gbit/s | `#006FFF` |
+| 10 Gbit/s | `#4F46E5` |
+| Disconnected | `#4B5563` |
+
+### Ports
+
+Each port supports the following options:
+
+| Option | Description |
+| :--- | :--- |
+| `name` | Port name, shown in the tooltip |
+| `number` | Port number, shown inside the square and in the tooltip |
+| `speed` | Optional entity with the link speed of the port. Without it, or when the port is disconnected, the square is grey (`#4B5563`) |
 
 ### Example
 
@@ -138,6 +167,16 @@ devices:
   - name: Switch
     type: switch
     ip: 192.168.1.2
+    uplink_speed: sensor.switch_uplink_speed
+    ports:
+      - name: NAS
+        number: 1
+        speed: sensor.switch_port_1_speed
+      - name: Access point
+        number: 2
+        speed: sensor.switch_port_2_speed
+      - name: Unused
+        number: 3
 ```
 
 The device list can be expanded by clicking the card header. CPU and RAM
