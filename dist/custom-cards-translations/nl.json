@@ -132,5 +132,8 @@
   "rows.back": "Terug",
   "rows.color": "Kleur kiezen",
   "rows.brightness": "Helderheid",
-  "error.rows_value_order": "Regel {index}: value_order moet een lijst met unieke waarden zijn: temperature, humidity, illuminance, pressure of power."
+  "error.rows_value_order": "Regel {index}: value_order moet een lijst met unieke waarden zijn: temperature, humidity, illuminance, pressure of power.",
+  "network.uplink": "Uplink: {speed}",
+  "network.port_tooltip": "{name} (poort {number}): {speed}",
+  "network.link.disconnected": "Niet verbonden"
 }
