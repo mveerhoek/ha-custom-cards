@@ -132,5 +132,8 @@
   "rows.back": "Back",
   "rows.color": "Choose colour",
   "rows.brightness": "Brightness",
-  "error.rows_value_order": "Entry {index}: value_order must be a list of unique values: temperature, humidity, illuminance, pressure or power."
+  "error.rows_value_order": "Entry {index}: value_order must be a list of unique values: temperature, humidity, illuminance, pressure or power.",
+  "network.uplink": "Uplink: {speed}",
+  "network.port_tooltip": "{name} (port {number}): {speed}",
+  "network.link.disconnected": "Disconnected"
 }
