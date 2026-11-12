@@ -388,8 +388,8 @@ ha-card {
   width: 18px;
   height: 18px;
   border-radius: 3px;
-  background: #9CA3AF;
-  cursor: help;
+  background: #4B5563;
+  cursor: default;
 }
 
 /* Tweede rij onder de apparaatnaam: poortvierkantjes */
@@ -401,6 +401,17 @@ ha-card {
   margin: -2px 0 6px;
 }
 
+/* Klikbaar (sensor gekoppeld): opent de geschiedenis van de sensor */
+.link-clickable {
+  cursor: pointer;
+}
+
+.link-clickable:hover,
+.link-clickable:focus-visible {
+  filter: brightness(1.15);
+  outline: none;
+}
+
 .port-square {
   display: flex;
   align-items: center;
@@ -408,13 +419,13 @@ ha-card {
   width: 16px;
   height: 16px;
   border-radius: 3px;
-  background: #9CA3AF;
+  background: #4B5563;
   color: #FFFFFF;
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  cursor: help;
+  cursor: default;
 }
 
 .restart-btn {
