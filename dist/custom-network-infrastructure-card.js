@@ -3,6 +3,26 @@
   const start = () => {
     const { CardBase, registerCard } = window.CustomCardsShared;
 
+    // Kleuren per linksnelheid, per thema (aflopend gesorteerd: de eerste snelheid die past wint)
+    const LINK_SPEEDS = [
+      { mbit: 10000, label: "10 Gbit/s",
+        dark: { color: "#4F46E5", text: "#FFFFFF" }, light: { color: "#2563EB", text: "#FFFFFF" } },
+      { mbit: 5000, label: "5 Gbit/s",
+        dark: { color: "#006FFF", text: "#FFFFFF" }, light: { color: "#3B82F6", text: "#FFFFFF" } },
+      { mbit: 2500, label: "2.5 Gbit/s",
+        dark: { color: "#00A0DF", text: "#FFFFFF" }, light: { color: "#06B6D4", text: "#1F2937" } },
+      { mbit: 1000, label: "1 Gbit/s",
+        dark: { color: "#00A859", text: "#FFFFFF" }, light: { color: "#10B981", text: "#1F2937" } },
+      { mbit: 100, label: "100 Mbit/s",
+        dark: { color: "#EAB308", text: "#1F2937" }, light: { color: "#F59E0B", text: "#1F2937" } },
+      { mbit: 10, label: "10 Mbit/s",
+        dark: { color: "#D97706", text: "#FFFFFF" }, light: { color: "#E06D06", text: "#FFFFFF" } }
+    ];
+    const DISCONNECTED = {
+      dark: { color: "#4B5563", text: "#FFFFFF" },
+      light: { color: "#9CA3AF", text: "#1F2937" }
+    };
+
     class CustomNetworkInfrastructureCard extends CardBase {
       setConfig(config) {
         this._configError = null;
@@ -89,6 +109,15 @@
         this._update();
       }
 
+      // Ook opnieuw tekenen als het thema wisselt tussen licht en donker
+      _hasRelevantChanges(hass) {
+        const changed = super._hasRelevantChanges(hass);
+        const darkMode = hass.themes?.darkMode;
+        const themeChanged = this._darkMode !== darkMode;
+        this._darkMode = darkMode;
+        return changed || themeChanged;
+      }
+
       _getTrackerIp(entityId) {
         if (!entityId || !this._hass) return null;
         const state = this._hass.states[entityId];
@@ -106,6 +135,62 @@
         }
         const value = this._getValue(source);
         return value !== null ? value : "0";
+      }
+
+      // Linksnelheid uit een entiteit (of een getal in de config), in Mbit/s.
+      // Ondersteunt "1000", "1000 Mbps", "1 Gbps", "2,5 Gbit/s" en een eenheid in
+      // het attribuut unit_of_measurement. Geeft null bij niet verbonden/onbekend.
+      _getLinkSpeed(source) {
+        if (source === undefined || source === null || source === "") return null;
+
+        let raw = source;
+        let unit = "";
+
+        if (typeof source === "string") {
+          const state = this._getState(source);
+          if (!state) return null;
+          raw = this._getValue(source);
+          unit = state.attributes?.unit_of_measurement || "";
+        }
+
+        if (raw === null) return null;
+
+        const match = String(raw).trim().match(/^([\d.,]+)\s*([a-z/]*)/i);
+        if (!match) return null;
+
+        let mbit = Number(match[1].replace(",", "."));
+        if (!Number.isFinite(mbit)) return null;
+
+        const speedUnit = match[2] || unit;
+        if (/^g/i.test(speedUnit)) mbit *= 1000;
+        else if (/^k/i.test(speedUnit)) mbit /= 1000;
+
+        return LINK_SPEEDS.find((speed) => mbit >= speed.mbit) || null;
+      }
+
+      // Maakt een vierkantje klikbaar: opent het more-info dialoog (met geschiedenis)
+      // van de gekoppelde sensor. Zonder sensor-entiteit blijft het vlak niet klikbaar.
+      _makeLinkClickable(element, entityId) {
+        if (typeof entityId !== "string" || !entityId) return;
+
+        element.classList.add("link-clickable");
+        element.setAttribute("role", "button");
+        element.setAttribute("tabindex", "0");
+
+        this._onActivate(element, () => this._openMoreInfo(entityId), { stopPropagation: true });
+      }
+
+      // Kleurt een vierkantje en zet de tooltip (snelheid bij hover)
+      _applyLink(element, link, tooltipKey, params = {}, suffix = "") {
+        const theme = this._hass?.themes?.darkMode === false ? "light" : "dark";
+        const colors = (link || DISCONNECTED)[theme];
+        const speedText = link ? link.label : this._t("network.link.disconnected");
+        const tooltip = this._t(tooltipKey, { ...params, speed: speedText }) + suffix;
+
+        element.style.background = colors.color;
+        element.style.color = colors.text;
+        element.title = tooltip;
+        element.setAttribute("aria-label", tooltip);
       }
 
       _getDeviceIcon(type) {
@@ -167,6 +252,7 @@
           headerCell(this._t("network.header.ip"), "col-center"),
           headerCell(this._t("label.cpu"), "col-center"),
           headerCell(this._t("label.ram"), "col-center"),
+          headerCell(""),
           headerCell("")
         );
 
@@ -197,6 +283,16 @@
           this._makeClickable(cpuSpan, device.cpu);
           this._makeClickable(ramSpan, device.memory);
 
+          // Uplink-vlak (links van de herstart-knop); zonder uplink_speed blijft de cel leeg
+          let uplinkCell;
+          if (device.uplink_speed) {
+            uplinkCell = document.createElement("div");
+            uplinkCell.className = "link-square";
+            this._makeLinkClickable(uplinkCell, device.uplink_speed);
+          } else {
+            uplinkCell = document.createElement("div");
+          }
+
           // Herstart-knop (helemaal rechts); zonder restart_action blijft de cel leeg
           let restartCell;
           if (device.restart_action) {
@@ -217,9 +313,46 @@
             restartCell = document.createElement("div");
           }
 
-          this._devicesList.append(devIcon, nameDiv, ipSpan, cpuSpan, ramSpan, restartCell);
+          this._devicesList.append(devIcon, nameDiv, ipSpan, cpuSpan, ramSpan, uplinkCell, restartCell);
 
-          this._deviceElements.push({ ipSpan, cpuSpan, ramSpan, config: device });
+          // Tweede rij onder de apparaatnaam: een vierkantje per poort
+          const portElements = [];
+          const ports = Array.isArray(device.ports) ? device.ports : [];
+
+          if (ports.length) {
+            const portsRow = document.createElement("div");
+            portsRow.className = "device-ports";
+
+            ports.forEach((port) => {
+              const square = document.createElement("div");
+              square.className = "port-square";
+
+              const numberSpan = document.createElement("span");
+              numberSpan.textContent = port.number ?? "";
+
+              // Bliksemicoon: vervangt het poortnummer zolang er PoE-vermogen wordt geleverd
+              const poeIcon = document.createElement("ha-icon");
+              poeIcon.icon = "mdi:lightning-bolt";
+              poeIcon.hidden = true;
+
+              square.append(numberSpan, poeIcon);
+              this._makeLinkClickable(square, port.speed);
+              portsRow.append(square);
+
+              portElements.push({ square, numberSpan, poeIcon, config: port });
+            });
+
+            this._devicesList.append(portsRow);
+          }
+
+          this._deviceElements.push({
+            ipSpan,
+            cpuSpan,
+            ramSpan,
+            uplinkCell: device.uplink_speed ? uplinkCell : null,
+            portElements,
+            config: device
+          });
         });
       }
 
@@ -261,11 +394,41 @@
 
           el.cpuSpan.textContent = cpuVal !== null ? this._formatNumber(cpuVal, 1) + cpuUnit : "—";
           el.ramSpan.textContent = ramVal !== null ? this._formatNumber(ramVal, 0) + ramUnit : "—";
+
+          // Uplink-snelheid van het apparaat
+          if (el.uplinkCell) {
+            this._applyLink(el.uplinkCell, this._getLinkSpeed(el.config.uplink_speed), "network.uplink");
+          }
+
+          // Poorten (zonder snelheid of kleur: niet verbonden)
+          el.portElements.forEach(({ square, numberSpan, poeIcon, config }) => {
+            // PoE-vermogen (optioneel): alleen tonen als de waarde groter is dan 0
+            let poeSuffix = "";
+            let poeActive = false;
+
+            if (config.poe_power) {
+              const poeValue = Number(this._getValue(config.poe_power));
+              if (Number.isFinite(poeValue) && poeValue > 0) {
+                const poeUnit = this._hass.states[config.poe_power]?.attributes?.unit_of_measurement || "W";
+                poeSuffix = `, ${this._formatNumber(poeValue, 1)} ${poeUnit}`;
+                poeActive = true;
+              }
+            }
+
+            numberSpan.hidden = poeActive;
+            poeIcon.hidden = !poeActive;
+
+            this._applyLink(square, this._getLinkSpeed(config.speed), "network.port_tooltip", {
+              name: config.name || "",
+              number: config.number ?? ""
+            }, poeSuffix);
+          });
         });
       }
 
       getCardSize() {
-        return 3 + (this._expanded ? this._config.devices.length + 1 : 0);
+        const portRows = this._config.devices.filter((d) => Array.isArray(d.ports) && d.ports.length).length;
+        return 3 + (this._expanded ? this._config.devices.length + 1 + Math.ceil(portRows / 2) : 0);
       }
     }
 

@@ -351,9 +351,17 @@ ha-card {
 }
 
 .devices-list {
-  /* rij 1 = koprij, rij 2 = dunne scheidingslijn, daarna de apparaten */
+  /* kolommen: icoon | naam | IP | CPU | RAM | uplink-vlak | herstart-knop */
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto auto auto;
+  /* rij 1 = koprij, rij 2 = dunne scheidingslijn, daarna de apparaten.
+     De hoogte van een apparaatrij komt van de naam (line-height); de poortenrij
+     eronder is daardoor compact. */
   grid-template-rows: minmax(25px, auto) 1px;
-  grid-auto-rows: minmax(25px, auto);
+  grid-auto-rows: auto;
+}
+
+.devices-list .device-name {
+  line-height: 25px;
 }
 
 .device-header-cell {
@@ -373,6 +381,62 @@ ha-card {
 
 .device-ip {
   opacity: 0.8;
+}
+
+/* Uplink-vlak: even groot als het herstart-icoon, kleur komt uit de linksnelheid */
+.link-square {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  background: #4B5563;
+  cursor: default;
+}
+
+/* Tweede rij onder de apparaatnaam: poortvierkantjes */
+.device-ports {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -2px 0 6px;
+}
+
+/* PoE-icoon in het poortvlak */
+.port-square ha-icon {
+  --mdc-icon-size: 12px;
+  display: flex;
+}
+
+.port-square ha-icon[hidden],
+.port-square span[hidden] {
+  display: none;
+}
+
+/* Klikbaar (sensor gekoppeld): opent de geschiedenis van de sensor */
+.link-clickable {
+  cursor: pointer;
+}
+
+.link-clickable:hover,
+.link-clickable:focus-visible {
+  filter: brightness(1.15);
+  outline: none;
+}
+
+.port-square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: #4B5563;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
 }
 
 .restart-btn {
