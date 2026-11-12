@@ -143,6 +143,7 @@ Each port supports the following options:
 | `name` | Port name, shown in the tooltip |
 | `number` | Port number, shown inside the square and in the tooltip |
 | `speed` | Optional entity with the link speed of the port. Without it, or when the port is disconnected, the square is grey (`#4B5563`) |
+| `poe_power` | Optional entity with the PoE power of the port. When the value is greater than 0, the tooltip gets `, <power> <unit>` after the link speed and a `mdi:lightning-bolt` icon replaces the port number |
 
 ### Example
 
@@ -178,6 +179,7 @@ devices:
       - name: NAS
         number: 1
         speed: sensor.switch_port_1_speed
+        poe_power: sensor.switch_port_1_poe_power
       - name: Access point
         number: 2
         speed: sensor.switch_port_2_speed
