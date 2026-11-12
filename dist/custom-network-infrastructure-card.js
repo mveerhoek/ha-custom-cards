@@ -3,16 +3,25 @@
   const start = () => {
     const { CardBase, registerCard } = window.CustomCardsShared;
 
-    // Kleuren per linksnelheid (aflopend gesorteerd: de eerste snelheid die past wint)
+    // Kleuren per linksnelheid, per thema (aflopend gesorteerd: de eerste snelheid die past wint)
     const LINK_SPEEDS = [
-      { mbit: 10000, color: "#4F46E5", text: "#FFFFFF", label: "10 Gbit/s" },
-      { mbit: 5000, color: "#006FFF", text: "#FFFFFF", label: "5 Gbit/s" },
-      { mbit: 2500, color: "#00A0DF", text: "#FFFFFF", label: "2.5 Gbit/s" },
-      { mbit: 1000, color: "#00A859", text: "#FFFFFF", label: "1 Gbit/s" },
-      { mbit: 100, color: "#EAB308", text: "#1F2937", label: "100 Mbit/s" },
-      { mbit: 10, color: "#D97706", text: "#FFFFFF", label: "10 Mbit/s" }
+      { mbit: 10000, label: "10 Gbit/s",
+        dark: { color: "#4F46E5", text: "#FFFFFF" }, light: { color: "#2563EB", text: "#FFFFFF" } },
+      { mbit: 5000, label: "5 Gbit/s",
+        dark: { color: "#006FFF", text: "#FFFFFF" }, light: { color: "#3B82F6", text: "#FFFFFF" } },
+      { mbit: 2500, label: "2.5 Gbit/s",
+        dark: { color: "#00A0DF", text: "#FFFFFF" }, light: { color: "#06B6D4", text: "#1F2937" } },
+      { mbit: 1000, label: "1 Gbit/s",
+        dark: { color: "#00A859", text: "#FFFFFF" }, light: { color: "#10B981", text: "#1F2937" } },
+      { mbit: 100, label: "100 Mbit/s",
+        dark: { color: "#EAB308", text: "#1F2937" }, light: { color: "#F59E0B", text: "#1F2937" } },
+      { mbit: 10, label: "10 Mbit/s",
+        dark: { color: "#D97706", text: "#FFFFFF" }, light: { color: "#E06D06", text: "#FFFFFF" } }
     ];
-    const DISCONNECTED = { color: "#4B5563", text: "#FFFFFF" };
+    const DISCONNECTED = {
+      dark: { color: "#4B5563", text: "#FFFFFF" },
+      light: { color: "#9CA3AF", text: "#1F2937" }
+    };
 
     class CustomNetworkInfrastructureCard extends CardBase {
       setConfig(config) {
@@ -100,6 +109,15 @@
         this._update();
       }
 
+      // Ook opnieuw tekenen als het thema wisselt tussen licht en donker
+      _hasRelevantChanges(hass) {
+        const changed = super._hasRelevantChanges(hass);
+        const darkMode = hass.themes?.darkMode;
+        const themeChanged = this._darkMode !== darkMode;
+        this._darkMode = darkMode;
+        return changed || themeChanged;
+      }
+
       _getTrackerIp(entityId) {
         if (!entityId || !this._hass) return null;
         const state = this._hass.states[entityId];
@@ -150,9 +168,22 @@
         return LINK_SPEEDS.find((speed) => mbit >= speed.mbit) || null;
       }
 
+      // Maakt een vierkantje klikbaar: opent het more-info dialoog (met geschiedenis)
+      // van de gekoppelde sensor. Zonder sensor-entiteit blijft het vlak niet klikbaar.
+      _makeLinkClickable(element, entityId) {
+        if (typeof entityId !== "string" || !entityId) return;
+
+        element.classList.add("link-clickable");
+        element.setAttribute("role", "button");
+        element.setAttribute("tabindex", "0");
+
+        this._onActivate(element, () => this._openMoreInfo(entityId), { stopPropagation: true });
+      }
+
       // Kleurt een vierkantje en zet de tooltip (snelheid bij hover)
       _applyLink(element, link, tooltipKey, params = {}) {
-        const colors = link || DISCONNECTED;
+        const theme = this._hass?.themes?.darkMode === false ? "light" : "dark";
+        const colors = (link || DISCONNECTED)[theme];
         const speedText = link ? link.label : this._t("network.link.disconnected");
         const tooltip = this._t(tooltipKey, { ...params, speed: speedText });
 
@@ -257,6 +288,7 @@
           if (device.uplink_speed) {
             uplinkCell = document.createElement("div");
             uplinkCell.className = "link-square";
+            this._makeLinkClickable(uplinkCell, device.uplink_speed);
           } else {
             uplinkCell = document.createElement("div");
           }
@@ -295,6 +327,7 @@
               const square = document.createElement("div");
               square.className = "port-square";
               square.textContent = port.number ?? "";
+              this._makeLinkClickable(square, port.speed);
               portsRow.append(square);
 
               portElements.push({ square, config: port });
