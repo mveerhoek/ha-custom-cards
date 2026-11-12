@@ -118,15 +118,21 @@ from the entity state in Mbit/s (`1000`), or with a unit (`1 Gbps`, `2,5 Gbit/s`
 or the `unit_of_measurement` attribute). A value that is unknown, unavailable,
 not a number or below 10 Mbit/s is shown as disconnected.
 
-| Speed | Colour |
-| :--- | :--- |
-| 10 Mbit/s | `#D97706` |
-| 100 Mbit/s | `#EAB308` |
-| 1 Gbit/s | `#00A859` |
-| 2.5 Gbit/s | `#00A0DF` |
-| 5 Gbit/s | `#006FFF` |
-| 10 Gbit/s | `#4F46E5` |
-| Disconnected | `#4B5563` |
+The colours follow the Home Assistant theme (dark or light) and change
+immediately when the theme is switched.
+
+| Speed | Dark theme | Light theme |
+| :--- | :--- | :--- |
+| 10 Mbit/s | `#D97706` | `#E06D06` |
+| 100 Mbit/s | `#EAB308` | `#F59E0B` |
+| 1 Gbit/s | `#00A859` | `#10B981` |
+| 2.5 Gbit/s | `#00A0DF` | `#06B6D4` |
+| 5 Gbit/s | `#006FFF` | `#3B82F6` |
+| 10 Gbit/s | `#4F46E5` | `#2563EB` |
+| Disconnected | `#4B5563` | `#9CA3AF` |
+
+The uplink square and every port square are clickable when an entity is
+configured: a click opens the entity details with its history.
 
 ### Ports
 
