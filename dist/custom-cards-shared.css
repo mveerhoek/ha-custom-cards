@@ -401,6 +401,17 @@ ha-card {
   margin: -2px 0 6px;
 }
 
+/* PoE-icoon in het poortvlak */
+.port-square ha-icon {
+  --mdc-icon-size: 12px;
+  display: flex;
+}
+
+.port-square ha-icon[hidden],
+.port-square span[hidden] {
+  display: none;
+}
+
 /* Klikbaar (sensor gekoppeld): opent de geschiedenis van de sensor */
 .link-clickable {
   cursor: pointer;
