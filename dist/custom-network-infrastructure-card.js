@@ -181,11 +181,11 @@
       }
 
       // Kleurt een vierkantje en zet de tooltip (snelheid bij hover)
-      _applyLink(element, link, tooltipKey, params = {}) {
+      _applyLink(element, link, tooltipKey, params = {}, suffix = "") {
         const theme = this._hass?.themes?.darkMode === false ? "light" : "dark";
         const colors = (link || DISCONNECTED)[theme];
         const speedText = link ? link.label : this._t("network.link.disconnected");
-        const tooltip = this._t(tooltipKey, { ...params, speed: speedText });
+        const tooltip = this._t(tooltipKey, { ...params, speed: speedText }) + suffix;
 
         element.style.background = colors.color;
         element.style.color = colors.text;
@@ -326,11 +326,20 @@
             ports.forEach((port) => {
               const square = document.createElement("div");
               square.className = "port-square";
-              square.textContent = port.number ?? "";
+
+              const numberSpan = document.createElement("span");
+              numberSpan.textContent = port.number ?? "";
+
+              // Bliksemicoon: vervangt het poortnummer zolang er PoE-vermogen wordt geleverd
+              const poeIcon = document.createElement("ha-icon");
+              poeIcon.icon = "mdi:lightning-bolt";
+              poeIcon.hidden = true;
+
+              square.append(numberSpan, poeIcon);
               this._makeLinkClickable(square, port.speed);
               portsRow.append(square);
 
-              portElements.push({ square, config: port });
+              portElements.push({ square, numberSpan, poeIcon, config: port });
             });
 
             this._devicesList.append(portsRow);
@@ -392,11 +401,27 @@
           }
 
           // Poorten (zonder snelheid of kleur: niet verbonden)
-          el.portElements.forEach(({ square, config }) => {
+          el.portElements.forEach(({ square, numberSpan, poeIcon, config }) => {
+            // PoE-vermogen (optioneel): alleen tonen als de waarde groter is dan 0
+            let poeSuffix = "";
+            let poeActive = false;
+
+            if (config.poe_power) {
+              const poeValue = Number(this._getValue(config.poe_power));
+              if (Number.isFinite(poeValue) && poeValue > 0) {
+                const poeUnit = this._hass.states[config.poe_power]?.attributes?.unit_of_measurement || "W";
+                poeSuffix = `, ${this._formatNumber(poeValue, 1)} ${poeUnit}`;
+                poeActive = true;
+              }
+            }
+
+            numberSpan.hidden = poeActive;
+            poeIcon.hidden = !poeActive;
+
             this._applyLink(square, this._getLinkSpeed(config.speed), "network.port_tooltip", {
               name: config.name || "",
               number: config.number ?? ""
-            });
+            }, poeSuffix);
           });
         });
       }
