@@ -7,3 +7,4 @@ import "./synology-nas-card.js";
 import "./custom-desktop-card.js";
 import "./custom-rows-card.js";
 import "./docker-combined-card.js";
+import "./dockhand-card.js"

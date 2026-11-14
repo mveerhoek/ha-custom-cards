@@ -135,5 +135,15 @@
   "error.rows_value_order": "Entry {index}: value_order must be a list of unique values: temperature, humidity, illuminance, pressure or power.",
   "network.uplink": "Uplink: {speed}",
   "network.port_tooltip": "{name} (port {number}): {speed}",
-  "network.link.disconnected": "Disconnected"
+  "network.link.disconnected": "Disconnected",
+  "card.dockhand.name": "Dockhand",
+  "card.dockhand.description": "Dockhand stacks and containers.",
+  "dockhand.title": "Dockhand",
+  "dockhand.status.created": "Created",
+  "dockhand.status.restarting": "Restarting",
+  "dockhand.status.partial_unknown": "Partially active",
+  "editor.dockhand.environment": "Environment",
+  "editor.dockhand.environment.help": "Optional: only show the stacks and containers of this Dockhand environment (name as shown in Dockhand).",
+  "editor.dockhand.css_url": "CSS URL",
+  "editor.dockhand.css_url.help": "Optional: path to your own copy of custom-cards-shared.css."
 }
