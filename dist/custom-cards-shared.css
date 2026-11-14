@@ -4,6 +4,7 @@
      - synology-nas-card
      - custom-desktop-card
      - docker-combined-card
+     - dockhand-card
      - custom-rows-card
 
    Opbouw
@@ -539,10 +540,11 @@ ha-card {
 /* Deze kaart gebruikt uitsluitend de gedeelde onderdelen hierboven. */
 
 
-/* ---------- docker-combined-card ---------- */
+/* ---------- docker-combined-card en dockhand-card (zelfde opmaak) ---------- */
 
 /* Kop: ruimer hovervlak, de inhoud blijft op zijn plek */
-:host(docker-combined-card) .header {
+:host(docker-combined-card) .header,
+:host(dockhand-card) .header {
   padding: 4px 6px;
   margin: -4px -6px 0;
   border-radius: 6px;
@@ -550,6 +552,7 @@ ha-card {
 }
 
 :host(docker-combined-card) .header:focus-visible,
+:host(dockhand-card) .header:focus-visible,
 .project-header:focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 3px;
@@ -579,7 +582,8 @@ ha-card {
 
 /* Hover-effect (alleen op apparaten met muis): achtergrond kleurt mee */
 @media (hover: hover) {
-  :host(docker-combined-card) .header:hover {
+  :host(docker-combined-card) .header:hover,
+  :host(dockhand-card) .header:hover {
     background: var(--secondary-background-color);
   }
 
