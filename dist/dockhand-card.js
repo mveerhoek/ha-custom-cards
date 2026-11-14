@@ -17,6 +17,9 @@
     };
     const MIB = 1024 ** 2;
 
+    // Zonder reactie verdwijnt de bevestiging na dit aantal milliseconden (zoals in custom-rows-card)
+    const CONFIRM_TIMEOUT = 5000;
+
     // Statuswaarden van Docker en Dockhand (blijven Engels, ook als HA in het Nederlands staat)
     const CONTAINER_STATES = ["running", "exited", "paused", "created", "restarting", "dead", "removing"];
     const STACK_STATES = ["running", "partial", "stopped", "created", "restarting"];
@@ -335,7 +338,18 @@
 
       // ----- Opbouw van de projecten -----
 
+      _disposeRows() {
+        for (const project of this._projects || []) {
+          for (const row of project.rows) row.dispose();
+        }
+      }
+
+      disconnectedCallback() {
+        this._disposeRows();
+      }
+
       _rebuildProjects(model) {
+        this._disposeRows();
         this._projects = model.projects.map((data) => this._createProject(data.name, data.members));
         this._projectList.replaceChildren(...this._projects.map((project) => project.el));
       }
@@ -437,28 +451,102 @@
           const toggleIcon = document.createElement("ha-icon");
           toggleButton.append(toggleIcon);
 
+          // Bevestiging in de rij zelf (geen pop-up): de cellen van de rij worden tijdelijk
+          // vervangen door de vraag met een kruis en een vink. Zonder reactie keert de rij
+          // na een paar seconden vanzelf terug.
+          const cells = [icon, nameEl, cpu, memory, state, toggleButton];
+
+          const confirmText = document.createElement("div");
+          confirmText.className = "container-confirm-text";
+
+          const confirmNo = this._iconButton("container-confirm-no", "mdi:close", () => row.showConfirm(false));
+
+          const confirmYes = this._iconButton("container-confirm-yes", "mdi:check", () => {
+            const switchId = row.container ? this._roles(row.container).switchId : null;
+            const turnOff = row.confirmTurnOff;
+
+            row.showConfirm(false);
+
+            if (!switchId) return;
+
+            this._runAction({
+              action: "perform-action",
+              perform_action: turnOff ? "switch.turn_off" : "switch.turn_on",
+              data: { entity_id: switchId },
+              confirmation: false
+            });
+          });
+
+          const confirmCells = [confirmText, confirmNo, confirmYes];
+          confirmCells.forEach((cell) => { cell.hidden = true; });
+
+          const row = {
+            name, container, icon, cpu, memory, state, toggleButton, toggleIcon,
+            confirmText, confirmNo, confirmYes,
+            confirmShown: false,
+            confirmTurnOff: false,
+            confirmTimer: null,
+
+            showConfirm: (show) => {
+              clearTimeout(row.confirmTimer);
+              row.confirmTimer = null;
+              row.confirmShown = show;
+
+              cells.forEach((cell) => { cell.hidden = show; });
+              confirmCells.forEach((cell) => { cell.hidden = !show; });
+
+              if (show) row.confirmTimer = setTimeout(() => row.showConfirm(false), CONFIRM_TIMEOUT);
+            },
+
+            dispose: () => {
+              clearTimeout(row.confirmTimer);
+              row.confirmTimer = null;
+            }
+          };
+
           toggleButton.addEventListener("click", (event) => {
             event.stopPropagation();
 
             const switchId = container ? this._roles(container).switchId : null;
             if (!switchId) return;
 
-            const turnOff = this._hass?.states[switchId]?.state === "on";
-
-            this._runAction({
-              action: "perform-action",
-              perform_action: turnOff ? "switch.turn_off" : "switch.turn_on",
-              data: { entity_id: switchId },
-              confirmation: {
-                text: this._t(turnOff ? "docker.confirm_off" : "docker.confirm_on", { name })
-              }
-            });
+            row.confirmTurnOff = this._hass?.states[switchId]?.state === "on";
+            this._updateConfirmText(row);
+            row.showConfirm(true);
           });
 
-          project.grid.append(icon, nameEl, cpu, memory, state, toggleButton);
+          project.grid.append(icon, nameEl, cpu, memory, state, toggleButton, ...confirmCells);
 
-          return { name, container, icon, cpu, memory, state, toggleButton, toggleIcon };
+          return row;
         });
+      }
+
+      // Ronde icoonknop (opmaak: .icon-btn, zoals in custom-rows-card)
+      _iconButton(className, iconName, onClick) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `icon-btn ${className}`;
+
+        const icon = document.createElement("ha-icon");
+        icon.icon = iconName;
+        button.append(icon);
+
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          onClick(event);
+        });
+
+        return button;
+      }
+
+      // Vraag en knoplabels van de bevestiging (volgen de taal van Home Assistant)
+      _updateConfirmText(row) {
+        const question = this._t(row.confirmTurnOff ? "docker.confirm_off" : "docker.confirm_on", { name: row.name });
+
+        row.confirmText.textContent = question;
+        row.confirmText.title = question;
+        row.confirmNo.setAttribute("aria-label", this._t("rows.cancel"));
+        row.confirmYes.setAttribute("aria-label", this._t("rows.confirm"));
       }
 
       // ----- Waarden -----
@@ -597,6 +685,12 @@
 
           if (known) resolved++;
           if (isRunning) runningRows++;
+
+          // Bevestiging open: tekst bijwerken; is de schakelaar inmiddels al omgezet, dan vervalt de vraag
+          if (row.confirmShown) {
+            if (row.confirmTurnOff !== (switchState === "on")) row.showConfirm(false);
+            else this._updateConfirmText(row);
+          }
 
           // Gestopte of onbekende containers hebben geen gebruik; draaiende zonder sensor: streepje
           const cpuValue = isRunning ? this._getNumber(roles.cpuId) : null;
