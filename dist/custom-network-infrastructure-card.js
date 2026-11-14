@@ -227,6 +227,7 @@
           this._networkElements.push({ textSpan, config: net });
         });
 
+        this._disposeConfirms();
         this._deviceElements = [];
         this._devicesList.replaceChildren();
 
@@ -295,6 +296,8 @@
 
           // Herstart-knop (helemaal rechts); zonder restart_action blijft de cel leeg
           let restartCell;
+          let confirm = null;
+
           if (device.restart_action) {
             restartCell = document.createElement("button");
             restartCell.className = "restart-btn";
@@ -306,14 +309,31 @@
             restartIcon.icon = "mdi:restart";
             restartCell.append(restartIcon);
 
-            restartCell.addEventListener("click", () =>
-              this._runAction(device.restart_action, this._t("network.restart_confirm", { name: device.name }))
-            );
+            // Bevestiging in de rij zelf (zie _rowConfirm in custom-cards-shared.js);
+            // met confirmation: false in de restart_action wordt direct herstart
+            confirm = this._rowConfirm({
+              cells: [devIcon, nameDiv, ipSpan, cpuSpan, ramSpan, uplinkCell, restartCell],
+              textClass: "device-confirm-text",
+              noClass: "device-confirm-no",
+              yesClass: "device-confirm-yes",
+              onConfirm: () => this._runAction({ ...device.restart_action, confirmation: false })
+            });
+
+            restartCell.addEventListener("click", () => {
+              const question = this._actionConfirmation(
+                device.restart_action,
+                this._t("network.restart_confirm", { name: device.name })
+              );
+
+              if (question) confirm.show(question.text);
+              else this._runAction(device.restart_action);
+            });
           } else {
             restartCell = document.createElement("div");
           }
 
           this._devicesList.append(devIcon, nameDiv, ipSpan, cpuSpan, ramSpan, uplinkCell, restartCell);
+          if (confirm) this._devicesList.append(...confirm.cells);
 
           // Tweede rij onder de apparaatnaam: een vierkantje per poort
           const portElements = [];
@@ -351,9 +371,19 @@
             ramSpan,
             uplinkCell: device.uplink_speed ? uplinkCell : null,
             portElements,
+            confirm,
             config: device
           });
         });
+      }
+
+      // Stopt de time-out van openstaande bevestigingen
+      _disposeConfirms() {
+        (this._deviceElements || []).forEach((el) => el.confirm?.dispose());
+      }
+
+      disconnectedCallback() {
+        this._disposeConfirms();
       }
 
       _update() {
