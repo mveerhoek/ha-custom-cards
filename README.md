@@ -2,7 +2,7 @@
 
 A collection of compact custom cards for Home Assistant. The cards
 display information about your network infrastructure, Synology NAS,
-desktop computer and Docker containers.
+desktop computer, Docker containers and Dockhand stacks.
 
 All cards share a common base library and stylesheet, providing a
 consistent appearance and centralised handling of commonly used
@@ -17,6 +17,7 @@ functionality.
 | **Custom Desktop Card** | Desktop computer status and performance | [Documentation](Documentation/custom-desktop-card.md) |
 | **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, sensors, consumption) | [Documentation](Documentation/custom-rows-card.md) |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project | [Documentation](Documentation/docker-combined-card.md) |
+| **Dockhand Card** | Overview of the stacks and containers of the Dockhand integration, discovered automatically | [Documentation](Documentation/dockhand-card.md) |
 
 ## Installation
 
@@ -43,7 +44,8 @@ ha-custom-cards/
 │   ├── synology-nas-card.md
 │   ├── custom-desktop-card.md
 │   ├── custom-rows-card.md
-│   └── docker-combined-card.md
+│   ├── docker-combined-card.md
+│   └── dockhand-card.md
 └── dist/
     ├── ha-custom-cards.js
     ├── custom-cards-shared.js
@@ -55,12 +57,14 @@ ha-custom-cards/
     ├── custom-cards-translations/
     │   ├── en.json
     │   └── nl.json
-    └── docker-combined-card.js
+    ├── docker-combined-card.js
+    └── dockhand-card.js
 ```
 
 -   **ha-custom-cards.js** -- central entry point that loads all cards.
 -   **custom-cards-shared.js** -- shared functionality, including the
-    base class, entity handling, status badges and actions.
+    base class, entity handling, status badges, actions and the confirmation
+    that is shown in the row itself.
 -   **custom-cards-shared.css** -- shared styling.
 -   The remaining JavaScript files contain the individual cards.
 -   **Documentation/** -- one configuration guide per card.
@@ -81,6 +85,7 @@ in a separate guide in the [Documentation](Documentation/) folder:
 -   [Custom Desktop Card](Documentation/custom-desktop-card.md)
 -   [Custom Rows Card](Documentation/custom-rows-card.md)
 -   [Docker Combined Card](Documentation/docker-combined-card.md)
+-   [Dockhand Card](Documentation/dockhand-card.md)
 
 All examples use the YAML configuration format for Home Assistant dashboards.
 
@@ -99,7 +104,7 @@ All text shown in the interface comes from these files: labels, status
 texts, confirmation questions, error messages, the card picker texts, the
 visual editor and the accessibility labels (`aria-label`) of buttons and
 sliders. Keys are grouped by prefix (`status.`, `label.`, `docker.`,
-`rows.`, `error.`, `editor.`, `card.`); every key must exist in `en.json`,
+`rows.`, `dockhand.`, `error.`, `editor.`, `card.`); every key must exist in `en.json`,
 other language files may leave out keys. Configured names, entity
 values and custom confirmation messages remain as supplied by the user or
 Home Assistant. Symbols and units (`·`, `—`, `%`, `°C`, `W`, `kWh`, `m³`)
@@ -120,6 +125,11 @@ help texts are translated like the rest of the interface.
 -   Missing or unavailable sensor values are displayed as `Unknown` or
     `—`.
 -   Clickable values open the standard Home Assistant more-info dialog.
+-   The Custom Rows Card, the Custom Network Infrastructure Card (restart) and
+    the Dockhand Card (start/stop) ask for confirmation in the row itself
+    instead of a pop-up: the row is replaced by the question with a cross
+    (cancel) and a check (confirm), and returns after five seconds without a
+    reaction.
 -   The cards use a shared stylesheet and support an optional `css_url`
     to specify an alternative stylesheet location.
 -   Entity IDs must match the entities available in your Home Assistant
