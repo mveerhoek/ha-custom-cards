@@ -638,6 +638,28 @@ ha-card {
   border-radius: 4px;
 }
 
+/* Bevestiging in de rij (dockhand-card): vraag over de eerste vier kolommen,
+   kruis en vink in de laatste twee. Compacte knoppen passen in de rij. */
+.container-confirm-text {
+  grid-column: 1 / span 4;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.container-grid .icon-btn {
+  width: 24px;
+  height: 24px;
+  --mdc-icon-size: 16px;
+}
+
+.container-confirm-no {
+  justify-self: end;
+}
+
 
 /* ---------- custom-rows-card ---------- */
 
