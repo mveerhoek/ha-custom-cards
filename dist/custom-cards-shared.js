@@ -327,6 +327,93 @@
       );
     }
 
+    // Ronde icoonknop (opmaak: .icon-btn)
+    _roundButton(className, iconName, onClick) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `icon-btn ${className}`.trim();
+
+      const icon = document.createElement("ha-icon");
+      icon.icon = iconName;
+      button.append(icon);
+
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onClick(event);
+      });
+
+      return button;
+    }
+
+    // Bevestiging in de rij zelf (geen pop-up). De cellen van de rij worden tijdelijk
+    // vervangen door een vraag met een kruis (annuleren) en een vink (bevestigen).
+    // Zonder reactie keert de rij na timeout milliseconden vanzelf terug.
+    // Geeft { cells, show(vraag), hide(), setQuestion(vraag), isShown(), dispose() };
+    // de bevestigingscellen (cells: vraag, kruis, vink) moeten door de aanroeper worden toegevoegd,
+    // aan een grid of aan een eigen container. Is die container (wrapper) opgegeven, dan wordt
+    // hij samen met de cellen getoond en verborgen; de rij (cells) kan dan uit één weergave bestaan.
+    _rowConfirm({ cells, wrapper, textClass, noClass, yesClass, onConfirm, timeout = 5000 }) {
+      let timer = null;
+      let shown = false;
+
+      const text = document.createElement("div");
+      text.className = textClass;
+
+      const no = this._roundButton(noClass, "mdi:close", () => hide());
+      const yes = this._roundButton(yesClass, "mdi:check", () => {
+        hide();
+        onConfirm();
+      });
+
+      const own = [text, no, yes];
+      own.forEach((cell) => { cell.hidden = true; });
+      if (wrapper) wrapper.hidden = true;
+
+      const setQuestion = (question) => {
+        text.textContent = question;
+        text.title = question;
+        no.setAttribute("aria-label", this._t("rows.cancel"));
+        yes.setAttribute("aria-label", this._t("rows.confirm"));
+      };
+
+      const hide = () => {
+        clearTimeout(timer);
+        timer = null;
+        shown = false;
+
+        cells.forEach((cell) => { cell.hidden = false; });
+        own.forEach((cell) => { cell.hidden = true; });
+        if (wrapper) wrapper.hidden = true;
+      };
+
+      const show = (question) => {
+        clearTimeout(timer);
+        setQuestion(question);
+        shown = true;
+
+        cells.forEach((cell) => { cell.hidden = true; });
+        own.forEach((cell) => { cell.hidden = false; });
+        if (wrapper) wrapper.hidden = false;
+
+        timer = setTimeout(hide, timeout);
+      };
+
+      return { cells: own, show, hide, setQuestion, isShown: () => shown, dispose: hide };
+    }
+
+    // Vraagt een actie om bevestiging? Dezelfde regel als _runAction: service-acties
+    // standaard wel, tenzij confirmation: false; met confirmation: { text } een eigen vraag.
+    _actionConfirmation(actionConfig, defaultText) {
+      if (!actionConfig) return null;
+
+      const type = actionConfig.action || "perform-action";
+      const isService = type === "perform-action" || type === "call-service";
+
+      if (!(actionConfig.confirmation ?? isService)) return null;
+
+      return { text: actionConfig.confirmation?.text || defaultText || this._t("action.confirm") };
+    }
+
     // Opent het standaard more-info dialoog (incl. geschiedenis) van de entiteit
     _openMoreInfo(entityId) {
       this.dispatchEvent(new CustomEvent("hass-more-info", {
