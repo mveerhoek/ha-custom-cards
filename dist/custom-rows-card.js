@@ -1786,35 +1786,25 @@
         const confirmLabels = document.createElement("div");
         confirmLabels.className = "extra-labels";
 
-        const confirmText = document.createElement("div");
-        confirmText.className = "entry-name";
-        confirmText.style.fontWeight = "400";
-        confirmLabels.append(confirmText);
+        // Vraag van de bevestiging (volgt de taal van Home Assistant)
+        const confirmQuestion = () =>
+          this._t("rows.confirm_off", {
+            name: extra.name || this._getState(extra.entity)?.attributes?.friendly_name || extra.entity
+          });
 
-        const confirmNo = this._iconButton(() => showConfirm(false));
-        confirmNo.setIcon("mdi:close");
-
-        const confirmYes = this._iconButton(() => {
-          showConfirm(false);
-          this._toggle(extra.entity);
+        // Bevestiging via de gedeelde helper (_rowConfirm in custom-cards-shared.js):
+        // vervangt de rij (view) door de vraag met kruis en vink en keert na 5 seconden vanzelf terug
+        const confirm = this._rowConfirm({
+          cells: [view],
+          wrapper: confirmView,
+          textClass: "entry-name",
+          onConfirm: () => this._toggle(extra.entity)
         });
-        confirmYes.setIcon("mdi:check");
 
-        confirmView.append(confirmLabels, confirmNo.el, confirmYes.el);
+        confirm.cells[0].style.fontWeight = "400";
+        confirmLabels.append(confirm.cells[0]);
+        confirmView.append(confirmLabels, confirm.cells[1], confirm.cells[2]);
         el.append(view, confirmView);
-
-        let confirmTimer = null;
-
-        const showConfirm = (show) => {
-          clearTimeout(confirmTimer);
-          confirmTimer = null;
-
-          view.hidden = show;
-          confirmView.hidden = !show;
-
-          // Zonder reactie keert de rij na een paar seconden vanzelf terug
-          if (show) confirmTimer = setTimeout(() => showConfirm(false), 5000);
-        };
 
         // Uitschakelen vraagt om bevestiging zolang de binary sensor aan staat;
         // aanzetten, of uitzetten terwijl de binary sensor uit staat, gaat direct.
@@ -1824,7 +1814,7 @@
           if (!this._hass || !state || state.state === "unavailable") return;
 
           if (state.state === "on" && extra.status && this._getState(extra.status)?.state === "on") {
-            showConfirm(true);
+            confirm.show(confirmQuestion());
           } else {
             this._toggle(extra.entity);
           }
@@ -1838,16 +1828,11 @@
           name.textContent = text;
           name.title = text;
 
-          const question = this._t("rows.confirm_off", { name: text });
-
-          confirmNo.el.setAttribute("aria-label", this._t("rows.cancel"));
-          confirmYes.el.setAttribute("aria-label", this._t("rows.confirm"));
-          confirmText.textContent = question;
-          confirmText.title = question;
+          if (confirm.isShown()) confirm.setQuestion(confirmQuestion());
 
           // Is de schakelaar al uit of de binary sensor inmiddels uit, dan vervalt de vraag
-          if (!confirmView.hidden && (!isOn || !extra.status || this._getState(extra.status)?.state !== "on")) {
-            showConfirm(false);
+          if (confirm.isShown() && (!isOn || !extra.status || this._getState(extra.status)?.state !== "on")) {
+            confirm.hide();
           }
 
           if (power) power.textContent = this._formatValue(extra.power, 0, "W");
@@ -1884,7 +1869,7 @@
           }
         };
 
-        return { el, update, dispose: () => clearTimeout(confirmTimer) };
+        return { el, update, dispose: () => confirm.dispose() };
       }
 
       // ----- Bijwerken -----
