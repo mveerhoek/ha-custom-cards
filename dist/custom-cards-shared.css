@@ -456,6 +456,30 @@ ha-card {
   outline: none;
 }
 
+/* Bevestiging in de rij (netwerkkaart): vraag over de eerste vijf kolommen,
+   kruis in de uplink-kolom en vink in de herstart-kolom. Compacte knoppen passen in de rij. */
+.device-confirm-text {
+  grid-column: 1 / span 5;
+  min-width: 0;
+  padding-left: 10px; /* gelijk aan de inspringing van het apparaaticoon */
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 25px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.devices-list .icon-btn {
+  width: 24px;
+  height: 24px;
+  --mdc-icon-size: 16px;
+}
+
+.device-confirm-no {
+  justify-self: end;
+}
+
 
 /* ---------- synology-nas-card ---------- */
 
