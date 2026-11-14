@@ -17,6 +17,10 @@
     };
     const MIB = 1024 ** 2;
 
+    // Statuswaarden van Docker en Dockhand (blijven Engels, ook als HA in het Nederlands staat)
+    const CONTAINER_STATES = ["running", "exited", "paused", "created", "restarting", "dead", "removing"];
+    const STACK_STATES = ["running", "partial", "stopped", "created", "restarting"];
+
     // Apparaatnamen zijn "{omgeving} – Stacks – {naam}" of "{omgeving} – Containers – {naam}"
     const parseDeviceName = (value) => {
       const parts = String(value || "").split(/\s+[–—-]\s+/).map((part) => part.trim()).filter(Boolean);
@@ -156,14 +160,17 @@
           if (entry.platform && entry.platform !== "dockhand") continue;
 
           if (!entriesByDevice.has(entry.device_id)) entriesByDevice.set(entry.device_id, []);
-          entriesByDevice.get(entry.device_id).push(entry.entity_id);
+          entriesByDevice.get(entry.device_id).push({
+            id: entry.entity_id,
+            key: entry.translation_key || ""
+          });
         }
 
         const environment = this._config.environment?.toLowerCase();
         const stacks = [];
         const containers = [];
 
-        for (const [deviceId, ids] of entriesByDevice) {
+        for (const [deviceId, entries] of entriesByDevice) {
           const device = hass.devices[deviceId];
           if (!device) continue;
 
@@ -175,38 +182,14 @@
           if (!parsed.name) continue;
           if (environment && parsed.env && parsed.env.toLowerCase() !== environment) continue;
 
-          // Eerste (kortste) entiteit van een domein die aan de test voldoet
-          const find = (domain, test) =>
-            ids
-              .filter((id) => id.startsWith(`${domain}.`) && test(id))
-              .sort((a, b) => a.length - b.length)[0] || null;
-
           const item = {
             env: parsed.env,
             name: parsed.name,
-            displayName: device.name_by_user ? parseDeviceName(device.name_by_user).name : parsed.name
+            displayName: device.name_by_user ? parseDeviceName(device.name_by_user).name : parsed.name,
+            entries
           };
 
-          if (kind === "stack") {
-            stacks.push({
-              ...item,
-              statusId: find("sensor", (id) => /_status$/.test(id) && !/sync_status$/.test(id)),
-              countId: find("sensor", (id) => /_containers$/.test(id))
-            });
-          } else {
-            containers.push({
-              ...item,
-              switchId: find("switch", (id) => !/auto_update/.test(id)),
-              stateId: find("sensor", (id) => /_state$/.test(id)),
-              cpuId: find("sensor", (id) => /_cpu_usage$/.test(id)),
-              // Meerdere geheugensensoren (bytes en %): de juiste wordt op eenheid gekozen
-              memoryIds: ids.filter(
-                (id) => id.startsWith("sensor.") && /_memory_usage/.test(id) && !/percent|pct|limit/.test(id)
-              ),
-              rxId: find("sensor", (id) => /_network_in$/.test(id)),
-              txId: find("sensor", (id) => /_network_out$/.test(id))
-            });
-          }
+          (kind === "stack" ? stacks : containers).push(item);
         }
 
         const containerMap = new Map(containers.map((c) => [`${c.env || ""}|${c.name}`, c]));
@@ -227,10 +210,68 @@
         return this._discovery;
       }
 
-      // Namen van de containers in een stack, uit de Containers-sensor van de stack
+      // Koppelt de entiteiten van een stack of container aan hun rol.
+      // De entiteit-id's volgen de taal van Home Assistant (bijv. "_cpu_gebruik"), daarom
+      // wordt eerst op translation_key gezocht, dan op Engelse en Nederlandse id's en
+      // tot slot op de status zelf (running, exited, ...).
+      _roles(item) {
+        const states = this._hass?.states;
+        if (item._rolesFor === states && item._roles) return item._roles;
+
+        const sensors = item.entries.filter((e) => e.id.startsWith("sensor."));
+        const test = (e, re) => re.test(e.key) || re.test(e.id);
+        const shortest = (list) => list.map((e) => e.id).sort((a, b) => a.length - b.length)[0] || null;
+        const pick = (re, exclude) =>
+          shortest(sensors.filter((e) => test(e, re) && !(exclude && test(e, exclude))));
+        const stateOf = (id) => states?.[id];
+
+        const resource = /cpu|memory|geheugen|network|netwerk|disk|schijf/i;
+
+        // Eerste sensor zonder eenheid waarvan de status aan de test voldoet
+        const byState = (test) =>
+          shortest(sensors.filter((e) => {
+            const state = stateOf(e.id);
+            return state && !state.attributes?.unit_of_measurement && !resource.test(e.id) && test(state);
+          }));
+
+        const roles = {
+          switchId: shortest(item.entries.filter(
+            (e) => e.id.startsWith("switch.") && !/auto_?(update|deploy)|automatisch/i.test(e.id + e.key)
+          )),
+          cpuId: pick(/cpu/i, /limit|limiet/i),
+          // Meerdere geheugensensoren (gebruik, limiet, %): de juiste wordt op eenheid gekozen
+          memoryIds: sensors
+            .filter((e) => test(e, /memory_usage|geheugengebruik/i) && !test(e, /percent|pct|limit|limiet/i))
+            .map((e) => e.id),
+          rxId: pick(/(network_in|netwerk_in)$/i),
+          txId: pick(/(network_out|netwerk_uit)$/i),
+          stateId:
+            pick(/^state$|_(state|staat)$/i) ||
+            byState((state) => CONTAINER_STATES.includes(state.state)),
+          statusId:
+            pick(/^status$|_status$/i, /sync/i) ||
+            byState((state) => STACK_STATES.includes(state.state)),
+          countId:
+            pick(/^containers$|_containers$/i) ||
+            byState((state) => state.state !== "" && Number.isFinite(Number(state.state)))
+        };
+
+        item._rolesFor = states;
+        item._roles = roles;
+
+        return roles;
+      }
+
+      // Namen van de containers in een stack (attribuut van de Containers- of Status-sensor)
       _memberNames(stack) {
-        const attributes = this._getState(stack.countId)?.attributes || {};
-        const raw = attributes.container_names ?? attributes.containers ?? attributes.names;
+        const roles = this._roles(stack);
+        let raw;
+
+        for (const id of [roles.countId, roles.statusId]) {
+          const attributes = this._getState(id)?.attributes || {};
+          raw = attributes.container_names ?? attributes.containers ?? attributes.names;
+          if (raw) break;
+        }
 
         let list = [];
         if (Array.isArray(raw)) {
@@ -284,16 +325,9 @@
         const ids = super._observedEntityIds();
         const { stacks, containers } = this._discover();
 
-        for (const stack of stacks) {
-          for (const id of [stack.statusId, stack.countId]) if (id) ids.add(id);
-        }
-
-        for (const container of containers) {
-          const own = [
-            container.switchId, container.stateId, container.cpuId,
-            container.rxId, container.txId, ...container.memoryIds
-          ];
-          for (const id of own) if (id) ids.add(id);
+        // Alle entiteiten van de apparaten: de rollen hangen mede af van hun status
+        for (const item of [...stacks, ...containers]) {
+          for (const entry of item.entries) ids.add(entry.id);
         }
 
         return ids;
@@ -398,7 +432,7 @@
           toggleButton.className = "container-toggle";
           toggleButton.type = "button";
           toggleButton.setAttribute("aria-label", this._t("docker.toggle", { name }));
-          toggleButton.style.visibility = container?.switchId ? "" : "hidden";
+          toggleButton.style.visibility = container && this._roles(container).switchId ? "" : "hidden";
 
           const toggleIcon = document.createElement("ha-icon");
           toggleButton.append(toggleIcon);
@@ -406,7 +440,7 @@
           toggleButton.addEventListener("click", (event) => {
             event.stopPropagation();
 
-            const switchId = container?.switchId;
+            const switchId = container ? this._roles(container).switchId : null;
             if (!switchId) return;
 
             const turnOff = this._hass?.states[switchId]?.state === "on";
@@ -440,8 +474,8 @@
       }
 
       // Geheugengebruik in MB: de sensor in bytes (niet de procentsensor)
-      _memoryMb(container) {
-        for (const id of container.memoryIds) {
+      _memoryMb(roles) {
+        for (const id of roles.memoryIds) {
           const bytes = this._bytes(id);
           if (bytes !== null && DATA_UNITS[String(this._getUnit(id)).toUpperCase()]) return bytes / MIB;
         }
@@ -529,6 +563,7 @@
 
       _updateProject(project, data) {
         const stack = data.stack;
+        const stackRoles = stack ? this._roles(stack) : null;
 
         let resolved = 0;
         let runningRows = 0;
@@ -543,10 +578,11 @@
 
         for (const row of project.rows) {
           const container = row.container;
+          const roles = container ? this._roles(container) : null;
 
           // Status: de State-sensor, anders de schakelaar
-          const stateValue = container ? this._getValue(container.stateId) : null;
-          const switchState = container ? this._hass.states[container.switchId]?.state : undefined;
+          const stateValue = roles ? this._getValue(roles.stateId) : null;
+          const switchState = roles ? this._hass.states[roles.switchId]?.state : undefined;
 
           let known = false;
           let isRunning = false;
@@ -563,10 +599,10 @@
           if (isRunning) runningRows++;
 
           // Gestopte of onbekende containers hebben geen gebruik; draaiende zonder sensor: streepje
-          const cpuValue = isRunning ? this._getNumber(container.cpuId) : null;
-          const memoryValue = isRunning ? this._memoryMb(container) : null;
-          const rxValue = isRunning ? this._bytes(container.rxId) : null;
-          const txValue = isRunning ? this._bytes(container.txId) : null;
+          const cpuValue = isRunning ? this._getNumber(roles.cpuId) : null;
+          const memoryValue = isRunning ? this._memoryMb(roles) : null;
+          const rxValue = isRunning ? this._bytes(roles.rxId) : null;
+          const txValue = isRunning ? this._bytes(roles.txId) : null;
 
           if (cpuValue !== null) { cpu += cpuValue; cpuSeen = true; }
           if (memoryValue !== null) { memory += memoryValue; memorySeen = true; }
@@ -602,23 +638,54 @@
           );
         }
 
+        // Een stack heeft zelf ook CPU-, geheugen- en netwerksensoren, met het aantal
+        // draaiende containers als attribuut. Die zijn leidend voor de projectregel.
+        let stackRunning = null;
+
+        if (stackRoles) {
+          const stackCpu = this._getNumber(stackRoles.cpuId);
+          const stackMemory = this._memoryMb(stackRoles);
+          const stackRx = this._bytes(stackRoles.rxId);
+          const stackTx = this._bytes(stackRoles.txId);
+
+          if (stackCpu !== null) { cpu = stackCpu; cpuSeen = true; }
+          if (stackMemory !== null) { memory = stackMemory; memorySeen = true; }
+          if (stackRx !== null) { rx = stackRx; rxSeen = true; }
+          if (stackTx !== null) { tx = stackTx; txSeen = true; }
+
+          for (const id of [stackRoles.cpuId, ...stackRoles.memoryIds, stackRoles.rxId, stackRoles.txId]) {
+            const value = Number(this._getState(id)?.attributes?.running_containers);
+            if (id && Number.isFinite(value) && this._getState(id)?.attributes?.running_containers !== undefined) {
+              stackRunning = value;
+              break;
+            }
+          }
+        }
+
         // Aantal containers: de ontdekte leden, of het aantal volgens de stack zelf
-        const stackCount = stack ? this._getNumber(stack.countId) : null;
+        const stackCount = stackRoles ? this._getNumber(stackRoles.countId) : null;
         const total = Math.max(project.rows.length, stackCount ?? 0);
 
-        // Stackstatus van Dockhand is leidend; zonder stack (of zonder status) tellen de containers
-        const stackStatus = stack ? this._getValue(stack.statusId) : null;
+        // Stackstatus van Dockhand: "running" betekent niet dat alle containers draaien
+        const stackStatus = stackRoles ? this._getValue(stackRoles.statusId) : null;
 
-        const running =
-          stackStatus === "running" ? total :
-          stackStatus === "stopped" ? 0 :
-          runningRows;
+        // Aantal draaiende containers, in volgorde van betrouwbaarheid:
+        // 1. het attribuut van de stacksensoren, 2. de eigen containers (als alle bekend zijn),
+        // 3. de stackstatus
+        let running = null;
+
+        if (stackRunning !== null) running = Math.min(stackRunning, total);
+        else if (project.rows.length && resolved === project.rows.length && project.rows.length === total) running = runningRows;
+        else if (!stack) running = runningRows;
+        else if (stackStatus === "running") running = total;
+        else if (stackStatus === "stopped") running = 0;
+        else if (resolved > 0) running = runningRows;
 
         // Niet-brekende spaties binnen een onderdeel: afbreken kan alleen tussen onderdelen
         const nb = text => text.trim().replace(/ /g, "\u00a0");
 
         // Een streepje als een draaiend project geen waarden levert (statistieken staan uit)
-        const idle = runningRows === 0;
+        const idle = running === 0 || (running === null && stackStatus === "stopped");
         const cpuText = cpuSeen || idle ? `${cpu.toFixed(1)}%` : "—";
         const memoryText = memorySeen || idle ? `${memory.toFixed(0)} MB` : "—";
         const rxText = rxSeen || idle ? this._formatBytes(rx) : "—";
@@ -640,10 +707,12 @@
         } else if (stackStatus === "created") {
           label = this._t("dockhand.status.created");
           type = "muted";
-        } else if (stackStatus === "partial" && resolved === 0) {
-          label = this._t("dockhand.status.partial_unknown");
-          type = "warning";
-        } else if (total === 0 || (!stackStatus && stack && resolved === 0)) {
+        } else if (running === null) {
+          // Geen aantallen bekend: val terug op de stackstatus
+          label =
+            stackStatus === "partial" ? this._t("dockhand.status.partial_unknown") : this._t("status.unknown");
+          type = stackStatus === "partial" ? "warning" : "muted";
+        } else if (total === 0) {
           label = this._t("status.unknown");
           type = "muted";
         } else if (running === total) {
@@ -660,7 +729,7 @@
         project.status.textContent = label;
         this._setBadge(project.status, type);
 
-        return { running, total, cpu, memory, cpuSeen, memorySeen };
+        return { running: running ?? 0, total, cpu, memory, cpuSeen, memorySeen };
       }
 
       getCardSize() {
