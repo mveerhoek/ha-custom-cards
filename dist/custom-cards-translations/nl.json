@@ -135,5 +135,15 @@
   "error.rows_value_order": "Regel {index}: value_order moet een lijst met unieke waarden zijn: temperature, humidity, illuminance, pressure of power.",
   "network.uplink": "Uplink: {speed}",
   "network.port_tooltip": "{name} (poort {number}): {speed}",
-  "network.link.disconnected": "Niet verbonden"
+  "network.link.disconnected": "Niet verbonden",
+  "card.dockhand.name": "Dockhand",
+  "card.dockhand.description": "Dockhand-stacks en -containers.",
+  "dockhand.title": "Dockhand",
+  "dockhand.status.created": "Aangemaakt",
+  "dockhand.status.restarting": "Herstarten",
+  "dockhand.status.partial_unknown": "Gedeeltelijk actief",
+  "editor.dockhand.environment": "Omgeving",
+  "editor.dockhand.environment.help": "Optioneel: toon alleen de stacks en containers van deze Dockhand-omgeving (naam zoals in Dockhand).",
+  "editor.dockhand.css_url": "CSS-URL",
+  "editor.dockhand.css_url.help": "Optioneel: pad naar een eigen versie van custom-cards-shared.css."
 }
