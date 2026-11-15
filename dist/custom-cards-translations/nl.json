@@ -145,5 +145,10 @@
   "editor.dockhand.environment": "Omgeving",
   "editor.dockhand.environment.help": "Optioneel: toon alleen de stacks en containers van deze Dockhand-omgeving (naam zoals in Dockhand).",
   "editor.dockhand.css_url": "CSS-URL",
-  "editor.dockhand.css_url.help": "Optioneel: pad naar een eigen versie van custom-cards-shared.css."
+  "editor.dockhand.css_url.help": "Optioneel: pad naar een eigen versie van custom-cards-shared.css.",
+  "modal.close": "Sluiten",
+  "modal.history": "Geschiedenis tonen",
+  "network.port_modal.port": "Poort",
+  "network.port_modal.speed": "Linksnelheid",
+  "network.port_modal.poe": "PoE-vermogen"
 }
