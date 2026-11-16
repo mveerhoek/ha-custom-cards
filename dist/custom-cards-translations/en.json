@@ -150,5 +150,6 @@
   "modal.history": "Show history",
   "network.port_modal.port": "Port",
   "network.port_modal.speed": "Link speed",
-  "network.port_modal.poe": "PoE power"
+  "network.port_modal.poe": "PoE power",
+  "network.port_modal.name": "Name"
 }
