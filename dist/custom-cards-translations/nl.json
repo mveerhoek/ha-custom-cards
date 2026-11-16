@@ -150,5 +150,6 @@
   "modal.history": "Geschiedenis tonen",
   "network.port_modal.port": "Poort",
   "network.port_modal.speed": "Linksnelheid",
-  "network.port_modal.poe": "PoE-vermogen"
+  "network.port_modal.poe": "PoE-vermogen",
+  "network.port_modal.name": "Naam"
 }
