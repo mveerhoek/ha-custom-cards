@@ -27,8 +27,8 @@ summary; clicking a displayed value opens its entity details.
 | `door` | No | Binary sensor: on shows an orange open-door badge, off a green closed-door badge |
 | `extras` | No | List of expandable controls |
 
-Each extra requires `type` and `entity` (except `sensors` and `consumption`,
-which use `entities` and separate sensor options). `name` and `icon` override the entity name and icon. Supported types:
+Each extra requires `type` and `entity` (except `sensors`, `consumption` and
+`bambu_print`, which use `entities` and separate sensor options). `name` and `icon` override the entity name and icon. Supported types:
 
 - `media_player`: the button on the left opens more-info; it shows the album
   artwork (or other graphic offered by the player) and falls back to the icon
@@ -111,6 +111,54 @@ which use `entities` and separate sensor options). `name` and `icon` override th
   If they do not fit on one line they continue on the next line. Clicking a
   value opens its entity details.
 
+- `bambu_print`: shows the current print of a Bambu Lab printer (ha-bambulab
+  integration) as up to three rows under the entry, in the same style as the
+  other extras. Instead of `entity` it takes separate entity options, all
+  optional but at least one is required. An option without an entity is left
+  out, and a row without any values is not shown at all. With a `status` entity
+  the temperature and print rows are also hidden while the printer is not busy
+  (not running, paused or preparing) and the nozzle is below 35 degrees, because
+  they are not relevant then. They return as soon as a print starts or the nozzle
+  is warmer than that. Without a `status` entity they are always shown.
+  - **Header:** the printer icon (`mdi:printer-3d`, overridable with `icon`;
+    orange while printing, yellow while paused, otherwise grey) and the name
+    (overridable with `name`). The second line shows the state of the `status`
+    entity, followed by the progress in percent while a print is active. On
+    the right are buttons to open the camera stream (`mdi:video`), to pause or
+    resume the print (`mdi:pause` / `mdi:play`) and to stop it (`mdi:stop`).
+  - **Temperatures:** the nozzle (`mdi:printer-3d-nozzle-heat`) and the bed
+    (`mdi:heating-coil`) as `current / target`, e.g. `215 / 220 °C`.
+  - **Print:** the layer (`mdi:layers-outline`) as `current / total`, the
+    remaining time (`mdi:timer-sand`) and the speed profile (`mdi:speedometer`).
+    If they do not fit on one line they continue on the next line.
+
+  The camera button opens the standard Home Assistant dialog of the `camera`
+  entity, which shows the stream. With a `status` entity only one of the pause
+  and resume buttons is shown at a time: pause while the print is running and
+  resume while it is paused. Pause and resume are disabled in every other state,
+  and stop is only enabled while a print is running, paused or being prepared.
+  Without a `status` entity both buttons are always shown and only the
+  availability of their button entity decides whether they are enabled.
+  Pausing, resuming and stopping each ask for an inline confirmation first, like
+  turning off a `power_switch`; the prompt closes after five seconds. Clicking a value opens
+  its entity details. The remaining time uses the unit of the sensor (seconds,
+  minutes, hours or days; minutes when it has none) and is shown as hours and
+  minutes.
+
+  | Option | ha-bambulab entity | Description |
+  | :--- | :--- | :--- |
+  | `status` | `sensor.<printer>_print_status` | State of the print; decides which pause/resume button is shown and when stop is enabled |
+  | `progress` | `sensor.<printer>_print_progress` | Progress in percent, shown after the status |
+  | `camera` | `camera.<printer>_camera` | Button that opens the camera stream |
+  | `pause` | `button.<printer>_pause_printing` | Button entity that pauses the print |
+  | `resume` | `button.<printer>_resume_printing` | Button entity that resumes the print |
+  | `stop` | `button.<printer>_stop_printing` | Button entity that stops the print, after confirmation |
+  | `nozzle_temperature`, `nozzle_target` | `sensor.<printer>_nozzle_temperature`, `sensor.<printer>_target_nozzle_temperature` | Nozzle temperature and target temperature |
+  | `bed_temperature`, `bed_target` | `sensor.<printer>_bed_temperature`, `sensor.<printer>_target_bed_temperature` | Bed temperature and target temperature |
+  | `speed` | `sensor.<printer>_speed_profile` | Print speed profile |
+  | `layer`, `total_layers` | `sensor.<printer>_current_layer`, `sensor.<printer>_total_layer_count` | Current layer and total number of layers |
+  | `remaining_time` | `sensor.<printer>_remaining_time` | Remaining print time |
+
 ```yaml
 type: custom:custom-rows-card
 entries:
@@ -161,6 +209,32 @@ entries:
         energy_export: sensor.energy_export_today
         gas: sensor.gas_consumption_today
         water: sensor.water_consumption_today
+```
+
+A Bambu Lab printer in its own entry:
+
+```yaml
+type: custom:custom-rows-card
+entries:
+  - name: Printer room
+    icon: mdi:printer-3d
+    extras:
+      - type: bambu_print
+        name: Bambu P1S
+        status: sensor.p1s_print_status
+        progress: sensor.p1s_print_progress
+        camera: camera.p1s_camera
+        pause: button.p1s_pause_printing
+        resume: button.p1s_resume_printing
+        stop: button.p1s_stop_printing
+        nozzle_temperature: sensor.p1s_nozzle_temperature
+        nozzle_target: sensor.p1s_target_nozzle_temperature
+        bed_temperature: sensor.p1s_bed_temperature
+        bed_target: sensor.p1s_target_bed_temperature
+        speed: sensor.p1s_speed_profile
+        layer: sensor.p1s_current_layer
+        total_layers: sensor.p1s_total_layer_count
+        remaining_time: sensor.p1s_remaining_time
 ```
 
 An entry whose `switch` is an `input_select` can give every option its own colour:
