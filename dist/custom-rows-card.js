@@ -42,6 +42,9 @@
     const BAMBU_PAUSED = ["pause", "paused"];
     const BAMBU_ACTIVE = ["running", "prepare", ...BAMBU_PAUSED];
 
+    // Zolang de nozzle minstens zo warm is, blijven de waarden-rijen zichtbaar, ook als de printer niet bezig is
+    const BAMBU_NOZZLE_WARM = 35;
+
     // Een duur in de eenheid van de sensor omgerekend naar minuten (standaard minuten)
     const MINUTES_PER_UNIT = { s: 1 / 60, min: 1, h: 60, d: 1440 };
 
@@ -1906,7 +1909,7 @@
           rowView.append(rowIconWrap, rowRight);
           el.append(rowView);
 
-          return { el, items };
+          return { el, items, iconWrap: rowIconWrap };
         };
 
         const temperatures = makeRow("mdi:thermometer", [
@@ -1950,7 +1953,29 @@
 
         const rows = [temperatures, progress].filter(Boolean);
 
+        // De iconen van de waarden-rijen springen in: hun linkerkant komt onder de linkerkant van de
+        // tekst in de kop te staan. De afstand wordt gemeten (icoon + tussenruimte van de kop), en
+        // opnieuw bepaald als de kaart van grootte verandert, bijvoorbeeld bij het uitklappen.
+        const indent = () => {
+          const iconBox = iconWrap.getBoundingClientRect();
+          const textBox = labels.getBoundingClientRect();
+
+          if (!iconBox.width || !textBox.width) return;
+
+          const offset = `${Math.max(0, Math.round(textBox.left - iconBox.left))}px`;
+
+          rows.forEach((row) => {
+            if (row.iconWrap.style.marginLeft !== offset) row.iconWrap.style.marginLeft = offset;
+          });
+        };
+
+        const resizeObserver = typeof ResizeObserver === "function" && rows.length ? new ResizeObserver(indent) : null;
+
+        resizeObserver?.observe(header);
+
         const update = () => {
+          indent();
+
           const state = extra.status ? this._getState(extra.status) : null;
           const phase = isAvailable(state) ? state.state : null;
           const paused = BAMBU_PAUSED.includes(phase);
@@ -2014,6 +2039,16 @@
             if (confirm.isShown() && stop.el.disabled) confirm.hide();
           }
 
+          // De waarden-rijen zijn alleen relevant als de printer bezig is of de nozzle nog warm is.
+          // Zonder status-entiteit is dat niet te bepalen en blijven ze altijd zichtbaar.
+          const nozzle = number(extra.nozzle_temperature);
+          const hideRows = !!extra.status && !active && !(nozzle !== null && nozzle >= BAMBU_NOZZLE_WARM);
+
+          rows.forEach(({ el }) => {
+            el.hidden = hideRows;
+            el.style.display = hideRows ? "none" : "";
+          });
+
           rows.forEach(({ items }) => items.forEach(({ def, item, value }) => {
             const valueText = def.text();
 
@@ -2029,7 +2064,10 @@
           el: header,
           els: [header, ...rows.map((row) => row.el)],
           update,
-          dispose: () => confirm?.dispose()
+          dispose: () => {
+            resizeObserver?.disconnect();
+            confirm?.dispose();
+          }
         };
       }
 
