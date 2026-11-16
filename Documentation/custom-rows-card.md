@@ -139,8 +139,8 @@ Each extra requires `type` and `entity` (except `sensors`, `consumption` and
   and stop is only enabled while a print is running, paused or being prepared.
   Without a `status` entity both buttons are always shown and only the
   availability of their button entity decides whether they are enabled.
-  Stopping asks for an inline confirmation first, like turning off a
-  `power_switch`; the prompt closes after five seconds. Clicking a value opens
+  Pausing, resuming and stopping each ask for an inline confirmation first, like
+  turning off a `power_switch`; the prompt closes after five seconds. Clicking a value opens
   its entity details. The remaining time uses the unit of the sensor (seconds,
   minutes, hours or days; minutes when it has none) and is shown as hours and
   minutes.
