@@ -202,6 +202,20 @@
         return { value, unit, text: `${this._formatNumber(value, 1)} ${unit}` };
       }
 
+      // Een poort telt als verbonden zolang er geen device_tracker is ingesteld, of zolang
+      // die tracker op "home" staat. Elke andere status (not_home, unavailable, onbekend)
+      // betekent dat het apparaat op die poort afwezig is.
+      _isPortConnected(port) {
+        if (!port.device_tracker) return true;
+        return this._getValue(port.device_tracker) === "home";
+      }
+
+      // Linksnelheid van een poort; null (niet verbonden) als de tracker afwezig is,
+      // ongeacht wat de snelheidssensor aangeeft
+      _getPortLink(port) {
+        return this._isPortConnected(port) ? this._getLinkSpeed(port.speed) : null;
+      }
+
       // Modal van een poort: de opbouw, het sluiten en het live verversen
       // zitten in CardBase (_openModal in custom-cards-shared.js)
       _openPortModal(trigger, device, port) {
@@ -209,13 +223,14 @@
           trigger,
           render: () => {
             const theme = this._hass?.themes?.darkMode === false ? "light" : "dark";
-            const link = this._getLinkSpeed(port.speed);
+            const link = this._getPortLink(port);
             const poe = this._getPortPoe(port);
 
             return {
               title: device.name || "",
               rows: [
                 { label: this._t("network.port_modal.port"), value: String(port.number ?? "—") },
+                { label: this._t("network.port_modal.name"), value: port.name, hidden: !port.name },
                 {
                   label: this._t("network.port_modal.speed"),
                   value: link ? link.label : this._t("network.link.disconnected"),
@@ -485,7 +500,7 @@
             this._applyLink(el.uplinkCell, this._getLinkSpeed(el.config.uplink_speed), "network.uplink");
           }
 
-          // Poorten (zonder snelheid of kleur: niet verbonden)
+          // Poorten (zonder snelheid, kleur of met afwezige tracker: niet verbonden)
           el.portElements.forEach(({ square, numberSpan, poeIcon, config }) => {
             // PoE-vermogen (optioneel): alleen tonen als de waarde groter is dan 0
             const poe = this._getPortPoe(config);
@@ -495,7 +510,7 @@
             numberSpan.hidden = poeActive;
             poeIcon.hidden = !poeActive;
 
-            this._applyLink(square, this._getLinkSpeed(config.speed), "network.port_tooltip", {
+            this._applyLink(square, this._getPortLink(config), "network.port_tooltip", {
               name: config.name || "",
               number: config.number ?? ""
             }, poeSuffix);
