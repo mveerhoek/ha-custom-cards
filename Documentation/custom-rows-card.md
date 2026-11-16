@@ -115,7 +115,11 @@ Each extra requires `type` and `entity` (except `sensors`, `consumption` and
   integration) as up to three rows under the entry, in the same style as the
   other extras. Instead of `entity` it takes separate entity options, all
   optional but at least one is required. An option without an entity is left
-  out, and a row without any values is not shown at all.
+  out, and a row without any values is not shown at all. With a `status` entity
+  the temperature and print rows are also hidden while the printer is not busy
+  (not running, paused or preparing) and the nozzle is below 35 degrees, because
+  they are not relevant then. They return as soon as a print starts or the nozzle
+  is warmer than that. Without a `status` entity they are always shown.
   - **Header:** the printer icon (`mdi:printer-3d`, overridable with `icon`;
     orange while printing, yellow while paused, otherwise grey) and the name
     (overridable with `name`). The second line shows the state of the `status`
