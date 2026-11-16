@@ -15,7 +15,7 @@ functionality.
 | **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices | [Documentation](Documentation/custom-network-infrastructure-card.md) |
 | **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks | [Documentation](Documentation/synology-nas-card.md) |
 | **Custom Desktop Card** | Desktop computer status and performance | [Documentation](Documentation/custom-desktop-card.md) |
-| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, sensors, consumption) | [Documentation](Documentation/custom-rows-card.md) |
+| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, sensors, consumption, Bambu Lab printer) | [Documentation](Documentation/custom-rows-card.md) |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project | [Documentation](Documentation/docker-combined-card.md) |
 | **Dockhand Card** | Overview of the stacks and containers of the Dockhand integration, discovered automatically | [Documentation](Documentation/dockhand-card.md) |
 
