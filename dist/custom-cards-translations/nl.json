@@ -138,6 +138,8 @@
   "rows.bambu_pause": "Print pauzeren",
   "rows.bambu_resume": "Print hervatten",
   "rows.bambu_stop": "Print stoppen",
+  "rows.bambu_confirm_pause": "Print pauzeren?",
+  "rows.bambu_confirm_resume": "Print hervatten?",
   "rows.bambu_confirm_stop": "Print stoppen?",
   "rows.bambu_hours_short": "u",
   "rows.bambu_minutes_short": "min",
