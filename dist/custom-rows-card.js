@@ -1981,7 +1981,13 @@
           // Met een status is er één pauze/hervat-knop (de ene vervangt de andere); zonder status
           // staan beide knoppen er en kan alleen de beschikbaarheid van de knop-entiteit bepalen
           const canSwitch = !!extra.status;
-          const isUsable = (entityId) => isAvailable(this._getState(entityId));
+          // Knop-entiteiten staan van zichzelf op "unknown" tot ze voor het eerst zijn ingedrukt;
+          // alleen een ontbrekende of "unavailable" entiteit maakt de knop onbruikbaar
+          const isUsable = (entityId) => {
+            const entityState = this._getState(entityId);
+
+            return !!entityState && entityState.state !== "unavailable";
+          };
 
           if (camera) {
             camera.el.disabled = !isUsable(extra.camera);
