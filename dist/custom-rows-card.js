@@ -1916,7 +1916,7 @@
           rowView.append(rowIconWrap, rowRight);
           el.append(rowView);
 
-          return { el, items, iconWrap: rowIconWrap };
+          return { el, items, iconWrap: rowIconWrap, icon: rowIconEl };
         };
 
         const temperatures = makeRow("mdi:thermometer", [
@@ -1960,18 +1960,26 @@
 
         const rows = [temperatures, progress].filter(Boolean);
 
-        // De iconen van de waarden-rijen springen in: hun linkerkant komt onder de linkerkant van de
-        // tekst in de kop te staan. De afstand wordt gemeten (icoon + tussenruimte van de kop), en
-        // opnieuw bepaald als de kaart van grootte verandert, bijvoorbeeld bij het uitklappen.
+        // De iconen van de waarden-rijen springen in: de linkerkant van het icoon zelf komt onder de
+        // linkerkant van de tekst in de kop te staan. De afstand wordt gemeten (icoon + tussenruimte
+        // van de kop, min de ruimte tussen de rand van het icoonvlak en het icoon) en opnieuw bepaald
+        // als de kaart van grootte verandert, bijvoorbeeld bij het uitklappen.
         const indent = () => {
           const iconBox = iconWrap.getBoundingClientRect();
           const textBox = labels.getBoundingClientRect();
 
           if (!iconBox.width || !textBox.width) return;
 
-          const offset = `${Math.max(0, Math.round(textBox.left - iconBox.left))}px`;
-
           rows.forEach((row) => {
+            const wrapBox = row.iconWrap.getBoundingClientRect();
+            const glyphBox = row.icon.getBoundingClientRect();
+
+            // Een verborgen rij heeft geen afmetingen; die wordt bij het tonen opnieuw uitgelijnd
+            if (!wrapBox.width || !glyphBox.width) return;
+
+            const inset = glyphBox.left - wrapBox.left;
+            const offset = `${Math.max(0, Math.round(textBox.left - iconBox.left - inset))}px`;
+
             if (row.iconWrap.style.marginLeft !== offset) row.iconWrap.style.marginLeft = offset;
           });
         };
@@ -1981,8 +1989,6 @@
         resizeObserver?.observe(header);
 
         const update = () => {
-          indent();
-
           const state = extra.status ? this._getState(extra.status) : null;
           const phase = isAvailable(state) ? state.state : null;
           const paused = BAMBU_PAUSED.includes(phase);
@@ -2065,6 +2071,9 @@
 
             if (title) item.title = title;
           }));
+
+          // Na het tonen of verbergen van de rijen, want alleen zichtbare rijen zijn te meten
+          indent();
         };
 
         return {
