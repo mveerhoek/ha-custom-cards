@@ -145,5 +145,11 @@
   "editor.dockhand.environment": "Environment",
   "editor.dockhand.environment.help": "Optional: only show the stacks and containers of this Dockhand environment (name as shown in Dockhand).",
   "editor.dockhand.css_url": "CSS URL",
-  "editor.dockhand.css_url.help": "Optional: path to your own copy of custom-cards-shared.css."
+  "editor.dockhand.css_url.help": "Optional: path to your own copy of custom-cards-shared.css.",  
+  "modal.close": "Close",
+  "modal.history": "Show history",
+  "network.port_modal.port": "Port",
+  "network.port_modal.speed": "Link speed",
+  "network.port_modal.poe": "PoE power",
+  "network.port_modal.name": "Name"
 }
