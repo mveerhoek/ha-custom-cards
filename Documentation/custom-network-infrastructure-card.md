@@ -123,6 +123,37 @@ devices:
 The device list can be expanded by clicking the card header. CPU and RAM
 values are clickable and open the corresponding entity details.
 
-A `restart_action` can be used to execute a Home Assistant action.
-Service actions ask for confirmation by default. This can be customised
-using `confirmation: false` or a custom confirmation message.
+A `restart_action` can be used to execute a Home Assistant action:
+
+``` yaml
+devices:
+  - name: Switch
+    type: switch
+    restart_action:
+      action: perform-action
+      perform_action: button.press
+      data:
+        entity_id: button.switch_restart
+```
+
+Service actions ask for confirmation by default, in the device row itself
+(no pop-up). After a click on the restart button the row (icon, name, IP
+address, CPU, RAM, uplink square and button) is replaced by the question
+*Restart x?* with a cross (cancel) and a check (confirm). Without a reaction
+the row returns after five seconds. The port squares stay visible.
+
+The confirmation can be customised:
+
+``` yaml
+restart_action:
+  action: perform-action
+  perform_action: button.press
+  data:
+    entity_id: button.switch_restart
+  confirmation:
+    text: Restart the switch? The network will be unavailable for a minute.
+```
+
+Use `confirmation: false` to restart immediately, without a question. Other
+action types, such as `navigate`, do not ask for confirmation unless
+`confirmation` is set.
