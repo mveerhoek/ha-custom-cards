@@ -128,7 +128,15 @@
       this._ensureLanguage();
 
       // Pas bijwerken zodra de teksten geladen zijn
-      if (this._strings && !this._configError && this._hasRelevantChanges(hass)) this._update();
+      if (this._strings && !this._configError && this._hasRelevantChanges(hass)) {
+        this._update();
+        this._refreshModal();
+      }
+    }
+
+    // Een modal hoort bij de opbouw van de kaart: bij herbouwen of loskoppelen sluit hij
+    disconnectedCallback() {
+      this._closeModal(false);
     }
 
     // Vergelijk alleen entiteiten waarop de configuratie betrekking heeft.
@@ -207,6 +215,7 @@
     // Eerste stap van _build(): false als er nog geen configuratie is
     _ensureShadow() {
       if (!this._config) return false;
+      this._closeModal(false);
       this._observedStates = null;
 
       if (!this.shadowRoot) {
@@ -421,6 +430,180 @@
         composed: true,
         detail: { entityId }
       }));
+    }
+
+    // ----- Modal -----
+
+    // Opent een modal met een titel en een lijst rijen (label links, waarde rechts).
+    // De inhoud komt uit render(), dat bij elke update van de kaart opnieuw wordt aangeroepen,
+    // zodat een open modal de actuele waarden toont:
+    //   render: () => ({ title, rows: [{ label, value, color, entityId, hidden }] })
+    //   - color:    kleurvlak voor de waarde (optioneel)
+    //   - entityId: maakt de waarde klikbaar; sluit het modal en opent het more-info
+    //               dialoog van de entiteit (met geschiedenis)
+    //   - hidden:   rij tijdelijk weglaten
+    // trigger is het element dat de focus terugkrijgt na het sluiten.
+    // Het modal staat op document.body (buiten de kaart, zodat het nooit wordt afgesneden)
+    // en laadt dezelfde stylesheet als de kaart (opmaak: .cc-modal-..., zie de CSS).
+    _openModal({ trigger, render }) {
+      this._closeModal(false);
+
+      const host = document.createElement("div");
+      const root = host.attachShadow({ mode: "open" });
+
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = this._config?.css_url || CSS_URL;
+
+      const backdrop = document.createElement("div");
+      backdrop.className = "cc-modal-backdrop";
+
+      const dialog = document.createElement("div");
+      dialog.className = "cc-modal";
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+
+      const header = document.createElement("div");
+      header.className = "cc-modal-header";
+
+      const title = document.createElement("div");
+      title.className = "cc-modal-title";
+
+      const closeBtn = this._roundButton("cc-modal-close", "mdi:close", () => this._closeModal());
+      closeBtn.title = this._t("modal.close");
+      closeBtn.setAttribute("aria-label", this._t("modal.close"));
+
+      const body = document.createElement("div");
+
+      header.append(title, closeBtn);
+      dialog.append(header, body);
+      backdrop.append(dialog);
+      root.append(link, backdrop);
+
+      // Verborgen tot de stylesheet geladen is, zodat er geen modal zonder opmaak oplicht
+      backdrop.style.visibility = "hidden";
+      const reveal = () => {
+        if (this._modal?.host !== host) return;
+        backdrop.style.visibility = "";
+        closeBtn.focus();
+      };
+      link.addEventListener("load", reveal);
+      link.addEventListener("error", () => {
+        console.error(`${this.localName}: stylesheet not found: ${link.href}`);
+        reveal();
+      });
+
+      backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) this._closeModal();
+      });
+
+      // Escape sluit; Tab blijft binnen het modal
+      const onKey = (event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          this._closeModal();
+        } else if (event.key === "Tab") {
+          const items = [...root.querySelectorAll("button, [tabindex='0']")];
+          if (!items.length) return;
+
+          event.preventDefault();
+          const index = items.indexOf(root.activeElement);
+          const last = items.length - 1;
+          const next = event.shiftKey
+            ? (index <= 0 ? last : index - 1)
+            : (index === -1 || index === last ? 0 : index + 1);
+          items[next].focus();
+        }
+      };
+      document.addEventListener("keydown", onKey, true);
+
+      this._modal = { host, root, dialog, title, body, trigger, render, onKey, signature: null };
+      this._refreshModal();
+
+      document.body.append(host);
+    }
+
+    // Bouwt de inhoud van het openstaande modal opnieuw op, maar alleen als die is
+    // veranderd (zo blijft de focus op een rij staan tijdens updates)
+    _refreshModal() {
+      const modal = this._modal;
+      if (!modal) return;
+
+      const { title = "", rows = [] } = modal.render() || {};
+      const visible = rows.filter((row) => row && !row.hidden);
+
+      const signature = JSON.stringify([title, visible]);
+      if (signature === modal.signature) return;
+      modal.signature = signature;
+
+      const focusedIndex = [...modal.body.children].findIndex((el) => el.contains(modal.root.activeElement));
+
+      modal.title.textContent = title;
+      modal.dialog.setAttribute("aria-label", title);
+      modal.body.replaceChildren();
+
+      visible.forEach((row) => {
+        const rowEl = document.createElement("div");
+        rowEl.className = "cc-modal-row";
+
+        const label = document.createElement("span");
+        label.className = "cc-modal-label";
+        label.textContent = row.label ?? "";
+
+        const value = document.createElement("span");
+        value.className = "cc-modal-value";
+
+        if (row.color) {
+          const swatch = document.createElement("span");
+          swatch.className = "cc-modal-swatch";
+          swatch.style.background = row.color;
+          value.append(swatch);
+        }
+
+        const text = document.createElement("span");
+        text.textContent = row.value ?? this._t("status.unknown");
+        value.append(text);
+
+        if (row.entityId) {
+          const history = this._t("modal.history");
+
+          value.classList.add("clickable");
+          value.setAttribute("role", "button");
+          value.setAttribute("tabindex", "0");
+          value.title = history;
+          value.setAttribute("aria-label", `${row.label}: ${text.textContent} (${history})`);
+
+          const icon = document.createElement("ha-icon");
+          icon.icon = "mdi:chart-line";
+          icon.className = "cc-modal-history";
+          value.append(icon);
+
+          // Het more-info dialoog moet boven alles komen: eerst het modal sluiten
+          this._onActivate(value, () => {
+            this._closeModal(false);
+            this._openMoreInfo(row.entityId);
+          }, { stopPropagation: true });
+        }
+
+        rowEl.append(label, value);
+        modal.body.append(rowEl);
+      });
+
+      if (focusedIndex >= 0) {
+        modal.body.children[focusedIndex]?.querySelector("[tabindex='0']")?.focus();
+      }
+    }
+
+    _closeModal(restoreFocus = true) {
+      const modal = this._modal;
+      if (!modal) return;
+
+      this._modal = null;
+      document.removeEventListener("keydown", modal.onKey, true);
+      modal.host.remove();
+
+      if (restoreFocus) modal.trigger?.focus?.();
     }
 
     // Voert een Home Assistant-actie uit. Ondersteunt: perform-action / call-service,

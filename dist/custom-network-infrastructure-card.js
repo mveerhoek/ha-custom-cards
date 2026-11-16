@@ -180,6 +180,75 @@
         this._onActivate(element, () => this._openMoreInfo(entityId), { stopPropagation: true });
       }
 
+      // Maakt een poortvierkantje klikbaar: opent een modal met apparaat, poort,
+      // linksnelheid en (indien van toepassing) PoE-vermogen. Altijd klikbaar,
+      // ook zonder snelheidssensor (dan staat er "niet verbonden").
+      _makePortClickable(element, device, port) {
+        element.classList.add("link-clickable");
+        element.setAttribute("role", "button");
+        element.setAttribute("tabindex", "0");
+
+        this._onActivate(element, () => this._openPortModal(element, device, port), { stopPropagation: true });
+      }
+
+      // PoE-vermogen van een poort; null als niet geconfigureerd of niet groter dan 0
+      _getPortPoe(port) {
+        if (!port.poe_power) return null;
+
+        const value = Number(this._getValue(port.poe_power));
+        if (!Number.isFinite(value) || value <= 0) return null;
+
+        const unit = this._hass?.states[port.poe_power]?.attributes?.unit_of_measurement || "W";
+        return { value, unit, text: `${this._formatNumber(value, 1)} ${unit}` };
+      }
+
+      // Een poort telt als verbonden zolang er geen device_tracker is ingesteld, of zolang
+      // die tracker op "home" staat. Elke andere status (not_home, unavailable, onbekend)
+      // betekent dat het apparaat op die poort afwezig is.
+      _isPortConnected(port) {
+        if (!port.device_tracker) return true;
+        return this._getValue(port.device_tracker) === "home";
+      }
+
+      // Linksnelheid van een poort; null (niet verbonden) als de tracker afwezig is,
+      // ongeacht wat de snelheidssensor aangeeft
+      _getPortLink(port) {
+        return this._isPortConnected(port) ? this._getLinkSpeed(port.speed) : null;
+      }
+
+      // Modal van een poort: de opbouw, het sluiten en het live verversen
+      // zitten in CardBase (_openModal in custom-cards-shared.js)
+      _openPortModal(trigger, device, port) {
+        this._openModal({
+          trigger,
+          render: () => {
+            const theme = this._hass?.themes?.darkMode === false ? "light" : "dark";
+            const link = this._getPortLink(port);
+            const poe = this._getPortPoe(port);
+
+            return {
+              title: device.name || "",
+              rows: [
+                { label: this._t("network.port_modal.port"), value: String(port.number ?? "—") },
+                { label: this._t("network.port_modal.name"), value: port.name, hidden: !port.name },
+                {
+                  label: this._t("network.port_modal.speed"),
+                  value: link ? link.label : this._t("network.link.disconnected"),
+                  color: (link || DISCONNECTED)[theme].color,
+                  entityId: typeof port.speed === "string" ? port.speed : null
+                },
+                {
+                  label: this._t("network.port_modal.poe"),
+                  value: poe?.text,
+                  entityId: port.poe_power,
+                  hidden: !poe
+                }
+              ]
+            };
+          }
+        });
+      }
+
       // Kleurt een vierkantje en zet de tooltip (snelheid bij hover)
       _applyLink(element, link, tooltipKey, params = {}, suffix = "") {
         const theme = this._hass?.themes?.darkMode === false ? "light" : "dark";
@@ -356,7 +425,7 @@
               poeIcon.hidden = true;
 
               square.append(numberSpan, poeIcon);
-              this._makeLinkClickable(square, port.speed);
+              this._makePortClickable(square, device, port);
               portsRow.append(square);
 
               portElements.push({ square, numberSpan, poeIcon, config: port });
@@ -383,6 +452,7 @@
       }
 
       disconnectedCallback() {
+        super.disconnectedCallback();
         this._disposeConfirms();
       }
 
@@ -430,30 +500,23 @@
             this._applyLink(el.uplinkCell, this._getLinkSpeed(el.config.uplink_speed), "network.uplink");
           }
 
-          // Poorten (zonder snelheid of kleur: niet verbonden)
+          // Poorten (zonder snelheid, kleur of met afwezige tracker: niet verbonden)
           el.portElements.forEach(({ square, numberSpan, poeIcon, config }) => {
             // PoE-vermogen (optioneel): alleen tonen als de waarde groter is dan 0
-            let poeSuffix = "";
-            let poeActive = false;
-
-            if (config.poe_power) {
-              const poeValue = Number(this._getValue(config.poe_power));
-              if (Number.isFinite(poeValue) && poeValue > 0) {
-                const poeUnit = this._hass.states[config.poe_power]?.attributes?.unit_of_measurement || "W";
-                poeSuffix = `, ${this._formatNumber(poeValue, 1)} ${poeUnit}`;
-                poeActive = true;
-              }
-            }
+            const poe = this._getPortPoe(config);
+            const poeActive = Boolean(poe);
+            const poeSuffix = poe ? `, ${poe.text}` : "";
 
             numberSpan.hidden = poeActive;
             poeIcon.hidden = !poeActive;
 
-            this._applyLink(square, this._getLinkSpeed(config.speed), "network.port_tooltip", {
+            this._applyLink(square, this._getPortLink(config), "network.port_tooltip", {
               name: config.name || "",
               number: config.number ?? ""
             }, poeSuffix);
           });
         });
+
       }
 
       getCardSize() {
