@@ -1827,9 +1827,9 @@
         right.className = "extra-right";
 
         const camera = extra.camera ? this._iconButton(() => this._openMoreInfo(extra.camera)) : null;
-        const pause = extra.pause ? this._iconButton(() => press(extra.pause)) : null;
-        const resume = extra.resume ? this._iconButton(() => press(extra.resume)) : null;
-        const stop = extra.stop ? this._iconButton(() => confirm?.show(this._t("rows.bambu_confirm_stop"))) : null;
+        const pause = extra.pause ? this._iconButton(() => ask(pause, extra.pause, "rows.bambu_confirm_pause")) : null;
+        const resume = extra.resume ? this._iconButton(() => ask(resume, extra.resume, "rows.bambu_confirm_resume")) : null;
+        const stop = extra.stop ? this._iconButton(() => ask(stop, extra.stop, "rows.bambu_confirm_stop")) : null;
 
         camera?.setIcon("mdi:video");
         pause?.setIcon("mdi:pause");
@@ -1839,11 +1839,18 @@
         right.append(...[camera, pause, resume, stop].filter(Boolean).map((button) => button.el));
         view.append(iconWrap, labels, right);
 
-        // Bevestiging voor stoppen: vervangt de kop tijdelijk door een vraag met een kruis en een vink
+        // Bevestiging voor pauzeren, hervatten en stoppen: vervangt de kop tijdelijk door een vraag met
+        // een kruis en een vink. Eén bevestiging voor alle drie; `pending` onthoudt voor welke knop.
         let confirm = null;
         let confirmView = null;
+        let pending = null;
 
-        if (stop) {
+        const ask = (button, entityId, questionKey) => {
+          pending = { button, entityId };
+          confirm?.show(this._t(questionKey));
+        };
+
+        if (pause || resume || stop) {
           confirmView = document.createElement("div");
           confirmView.className = "extra-view";
           confirmView.hidden = true;
@@ -1855,7 +1862,7 @@
             cells: [view],
             wrapper: confirmView,
             textClass: "entry-name",
-            onConfirm: () => press(extra.stop)
+            onConfirm: () => pending && press(pending.entityId)
           });
 
           confirm.cells[0].style.fontWeight = "400";
@@ -2034,10 +2041,10 @@
           if (stop) {
             stop.el.disabled = !isUsable(extra.stop) || (canSwitch && !active);
             stop.el.setAttribute("aria-label", this._t("rows.bambu_stop"));
-
-            // Kan de print niet meer gestopt worden, dan vervalt de vraag
-            if (confirm.isShown() && stop.el.disabled) confirm.hide();
           }
+
+          // Kan de gevraagde actie niet meer (bijvoorbeeld omdat de print klaar is), dan vervalt de vraag
+          if (confirm?.isShown() && (!pending || pending.button.el.disabled || pending.button.el.hidden)) confirm.hide();
 
           // De waarden-rijen zijn alleen relevant als de printer bezig is of de nozzle nog warm is.
           // Zonder status-entiteit is dat niet te bepalen en blijven ze altijd zichtbaar.
