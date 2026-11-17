@@ -124,7 +124,7 @@
     ];
 
     // Extras met een optionele badge en wanneer die getoond wordt:
-    // - power_switch: zolang de schakelaar aan staat
+    // - power_switch: zolang de schakelaar aan staat (of, met badge.use_status, zolang de status-sensor aan staat)
     // - media_player: zolang de speler afspeelt (state "playing")
     const BADGE_ACTIVE = {
       power_switch: (state) => state?.state === "on",
@@ -137,6 +137,14 @@
       media_player: "mdi:play"
     };
 
+    // De entiteit waarvan de status bepaalt of de badge van een extra getoond wordt. Standaard het
+    // extra zelf; bij een power_switch met badge.use_status en een geconfigureerde status-sensor
+    // (binary_sensor) is dat de status-sensor. Zonder status-sensor geldt use_status niet.
+    const badgeSource = (extra) =>
+      extra.type === "power_switch" && extra.badge?.use_status && extra.status
+        ? extra.status
+        : extra.entity;
+
     // Alle badges van een regel: de vaste badges (climate, deur) plus een badge per power_switch of
     // media_player met een badge-configuratie. Zo'n badge is alleen zichtbaar als het extra actief is
     // (zie BADGE_ACTIVE).
@@ -146,19 +154,22 @@
         .filter((extra) => BADGE_ACTIVE[extra.type] && extra.badge)
         .map((extra) => ({
           resolve: (card) =>
-            BADGE_ACTIVE[extra.type](card._getState(extra.entity))
+            BADGE_ACTIVE[extra.type](card._getState(badgeSource(extra)))
               ? { icon: extra.badge.icon, tone: "custom", color: extra.badge.color }
               : null
         }))
     ];
 
-    // Badge van een extra (power_switch of media_player): optioneel object { icon, color };
+    // Badge van een extra (power_switch of media_player): optioneel object { icon, color, use_status };
     // zonder badge geen badge. Zonder icon geldt het standaardicoon van het type.
+    // use_status (alleen power_switch, vereist een status-sensor): de badge volgt de status-sensor
+    // in plaats van de schakelaar.
     const parseBadge = (badge, defaultIcon) =>
       badge && typeof badge === "object" && !Array.isArray(badge)
         ? {
           icon: typeof badge.icon === "string" && badge.icon ? badge.icon : defaultIcon,
-          color: typeof badge.color === "string" && badge.color.trim() ? badge.color.trim() : "var(--primary-color)"
+          color: typeof badge.color === "string" && badge.color.trim() ? badge.color.trim() : "var(--primary-color)",
+          use_status: badge.use_status === true
         }
         : undefined;
 
