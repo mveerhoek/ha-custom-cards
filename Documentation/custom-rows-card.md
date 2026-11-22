@@ -28,7 +28,8 @@ summary; clicking a displayed value opens its entity details.
 | `extras` | No | List of expandable controls |
 
 Each extra requires `type` and `entity` (except `sensors`, `consumption` and
-`bambu_print`, which use `entities` and separate sensor options). `name` and `icon` override the entity name and icon. Supported types:
+`bambu_print`, which use `entities` and separate sensor options, and `image`, which
+uses `image`). `name` and `icon` override the entity name and icon. Supported types:
 
 - `media_player`: the button on the left opens more-info; it shows the album
   artwork (or other graphic offered by the player) and falls back to the icon
@@ -160,6 +161,32 @@ Each extra requires `type` and `entity` (except `sensors`, `consumption` and
   | `layer`, `total_layers` | `sensor.<printer>_current_layer`, `sensor.<printer>_total_layer_count` | Current layer and total number of layers |
   | `remaining_time` | `sensor.<printer>_remaining_time` | Remaining print time |
 
+- `camera`: a compact row with the icon (`mdi:camera`, overridable with `icon`),
+  the name in bold (overridable with `name`, otherwise the name of the entity) and, on
+  the far right, a button (`mdi:video`) that opens the camera stream: the standard
+  Home Assistant dialog of the `camera` entity, just like the camera button of
+  `bambu_print`. The button is disabled while the entity is missing or unavailable.
+
+- `image`: shows a static image over the full width of the row, with the height
+  following the proportions of the image. Instead of `entity` it takes `image`
+  (required); `name` is optional and is used as the alternative text and tooltip. The row
+  stays hidden until the image has loaded; if it cannot be loaded the row stays hidden
+  and a message is written to the browser console. `image` accepts these forms:
+
+  | Value | Description |
+  | :--- | :--- |
+  | `media/Latest/placeholder.jpg` | Short form: a file in the `media` folder of Home Assistant (media source `local`). Folders may be nested, e.g. `media/test/Latest/placeholder.jpg` |
+  | `/media/local/Latest/placeholder.jpg` | The URL shown in the media browser. The first part after `/media/` is the media source, so `local` is required |
+  | `media-source://media_source/local/Latest/placeholder.jpg` | The full media source address, for media sources other than `local` |
+  | `/local/image.jpg`, `https://example.com/image.jpg` | A file in the `www` folder or any other URL, used as is |
+
+  Files in the media folder are protected by Home Assistant authentication, so the
+  card asks Home Assistant for a signed URL (`media_source/resolve_media`) and
+  renews it every hour. The new image is loaded in the background first, so it does not
+  flicker, and a new file under the same name therefore appears within the hour. If
+  retrieving the URL fails, the card tries again after a minute. File and folder names
+  are case-sensitive.
+
 ```yaml
 type: custom:custom-rows-card
 entries:
@@ -239,6 +266,22 @@ entries:
         remaining_time: sensor.p1s_remaining_time
 ```
 
+A camera and an image in their own entry:
+
+```yaml
+type: custom:custom-rows-card
+entries:
+  - name: Front door
+    icon: mdi:door
+    extras:
+      - type: camera
+        entity: camera.front_door
+        name: Front door camera
+      - type: image
+        image: media/Latest/placeholder.jpg
+        name: Latest snapshot
+```
+
 An entry whose `switch` is an `input_select` can give every option its own colour:
 
 ```yaml
@@ -259,6 +302,34 @@ order shown above. A partial list puts those values first and appends the other
 configured values in default order. Unconfigured sensors are not displayed.
 
 The card also supports `css_url` for an alternative shared stylesheet.
+
+## Extras files
+
+The extras are not part of `custom-rows-card.js`. Every type has its own file in
+`dist/custom-rows-extras/`, which is imported by `ha-custom-cards.js`:
+
+| Type | File |
+| :--- | :--- |
+| `media_player` | `media.js` |
+| `climate` | `climate.js` |
+| `cover` | `cover.js` |
+| `light` | `light.js` |
+| `power_switch` | `power-switch.js` |
+| `sensors`, `consumption` | `sensors.js` |
+| `bambu_print` | `bambu.js` |
+| `camera` | `camera.js` |
+| `image` | `image.js` |
+
+A type whose file is not imported is unknown: after three seconds the card shows
+an error for that extra. You can therefore remove the imports of types you never
+use. The order in which the files are loaded does not matter; a card created before an
+extras file has loaded rebuilds itself as soon as the file is available.
+
+To add a type, create a file that registers the type in `window.CustomRowsExtras`
+with a `parse` function (validates the configuration of the extra), a `build`
+function (builds the row and returns `{ el, update, dispose }`) and optionally a
+badge, and add an import for it to `ha-custom-cards.js`. `camera.js` is the shortest
+example.
 
 ## Badges
 
