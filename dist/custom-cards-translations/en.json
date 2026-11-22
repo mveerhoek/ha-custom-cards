@@ -143,6 +143,7 @@
   "rows.bambu_confirm_stop": "Stop print?",
   "rows.bambu_hours_short": "h",
   "rows.bambu_minutes_short": "min",
+  "rows.camera_open": "Open camera stream",
   "error.rows_value_order": "Entry {index}: value_order must be a list of unique values: temperature, humidity, illuminance, pressure or power.",
   "network.uplink": "Uplink: {speed}",
   "network.port_tooltip": "{name} (port {number}): {speed}",
