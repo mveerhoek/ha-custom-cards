@@ -143,6 +143,7 @@
   "rows.bambu_confirm_stop": "Print stoppen?",
   "rows.bambu_hours_short": "u",
   "rows.bambu_minutes_short": "min",
+  "rows.camera_open": "Camerastream openen",
   "error.rows_value_order": "Regel {index}: value_order moet een lijst met unieke waarden zijn: temperature, humidity, illuminance, pressure of power.",
   "network.uplink": "Uplink: {speed}",
   "network.port_tooltip": "{name} (poort {number}): {speed}",
