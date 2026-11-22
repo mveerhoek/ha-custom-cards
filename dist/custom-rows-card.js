@@ -18,7 +18,7 @@
     const COLUMN_GAP = 20; // px
 
     // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "sensors", "consumption", "bambu_print"];
+    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "sensors", "consumption", "bambu_print", "camera"];
     const DEFAULT_STEP = 0.5; // °C per klik bij een climate
     const MAX_SENSORS = 8; // maximaal aantal entiteiten bij een sensors-element
 
@@ -491,6 +491,7 @@
               if (extra.type === "sensors") return this._buildSensors(extra);
               if (extra.type === "consumption") return this._buildConsumption(extra);
               if (extra.type === "bambu_print") return this._buildBambuPrint(extra);
+              if (extra.type === "camera") return this._buildCamera(extra);
               return this._buildMedia(extra);
             });
             extrasEl.append(...extras.flatMap((extra) => extra.els || [extra.el]));
@@ -2096,6 +2097,57 @@
             confirm?.dispose();
           }
         };
+      }
+
+      // ----- Extra element: camera -----
+
+      // Compacte rij (zelfde opmaak als de kop van de Bambu-printer): icoon | naam | [camera]
+      // De knop rechts opent de stream van de camera-entiteit (het more-info-venster), net als de
+      // camera-knop bij bambu_print.
+      _buildCamera(extra) {
+        const el = document.createElement("div");
+        el.className = "extra extra-power";
+
+        const view = document.createElement("div");
+        view.className = "extra-view";
+
+        const iconWrap = document.createElement("div");
+        iconWrap.className = "power-icon";
+
+        const icon = document.createElement("ha-icon");
+        icon.icon = extra.icon || "mdi:camera";
+        iconWrap.append(icon);
+
+        const labels = document.createElement("div");
+        labels.className = "extra-labels";
+
+        const name = document.createElement("div");
+        name.className = "entry-name";
+        labels.append(name);
+
+        const right = document.createElement("div");
+        right.className = "extra-right";
+
+        const camera = this._iconButton(() => this._openMoreInfo(extra.entity));
+        camera.setIcon("mdi:video");
+        right.append(camera.el);
+
+        view.append(iconWrap, labels, right);
+        el.append(view);
+
+        const update = () => {
+          const state = this._getState(extra.entity);
+          const text = extra.name || state?.attributes?.friendly_name || extra.entity;
+
+          name.textContent = text;
+          name.title = text;
+
+          // Zoals bij bambu_print: alleen een ontbrekende of "unavailable" camera maakt de knop onbruikbaar
+          camera.el.disabled = !state || state.state === "unavailable";
+          camera.el.setAttribute("aria-label", this._t("rows.camera_open"));
+        };
+
+        return { el, update };
       }
 
       // ----- Extra element: stroomschakelaar -----
