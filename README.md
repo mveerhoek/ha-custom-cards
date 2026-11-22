@@ -15,7 +15,7 @@ functionality.
 | **Custom Network Infrastructure Card** | Router status, networks, connected users and network devices | [Documentation](Documentation/custom-network-infrastructure-card.md) |
 | **Synology NAS Card** | NAS status, system usage, network traffic, volumes and disks | [Documentation](Documentation/synology-nas-card.md) |
 | **Custom Desktop Card** | Desktop computer status and performance | [Documentation](Documentation/custom-desktop-card.md) |
-| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, sensors, consumption, Bambu Lab printer) | [Documentation](Documentation/custom-rows-card.md) |
+| **Custom Rows Card** | Responsive rows with sensors, switches and expandable controls (media player, climate, power switch, cover, light, sensors, consumption, Bambu Lab printer, camera, image) | [Documentation](Documentation/custom-rows-card.md) |
 | **Docker Combined Card** | Overview of Docker containers, grouped by project | [Documentation](Documentation/docker-combined-card.md) |
 | **Dockhand Card** | Overview of the stacks and containers of the Dockhand integration, discovered automatically | [Documentation](Documentation/dockhand-card.md) |
 
@@ -27,7 +27,8 @@ functionality.
 4.  Install the repository. Ensure the dashboard resource points to
     `/hacsfiles/ha-custom-cards/ha-custom-cards.js` as a JavaScript module
     (adjust the path if your repository has a different HACS name). Keep the
-    other files and translation directory next to it.
+    other files, the `custom-rows-extras` directory and the translation directory
+    next to it.
 5.  Add the card to your dashboard using the visual editor or YAML
     configuration.
 
@@ -54,6 +55,16 @@ ha-custom-cards/
     ├── synology-nas-card.js
     ├── custom-desktop-card.js
     ├── custom-rows-card.js
+    ├── custom-rows-extras/
+    │   ├── media.js
+    │   ├── climate.js
+    │   ├── cover.js
+    │   ├── light.js
+    │   ├── power-switch.js
+    │   ├── sensors.js
+    │   ├── bambu.js
+    │   ├── camera.js
+    │   └── image.js
     ├── custom-cards-translations/
     │   ├── en.json
     │   └── nl.json
@@ -61,12 +72,17 @@ ha-custom-cards/
     └── dockhand-card.js
 ```
 
--   **ha-custom-cards.js** -- central entry point that loads all cards.
+-   **ha-custom-cards.js** -- central entry point that loads all cards and the
+    extras of the Custom Rows Card.
 -   **custom-cards-shared.js** -- shared functionality, including the
     base class, entity handling, status badges, actions and the confirmation
     that is shown in the row itself.
 -   **custom-cards-shared.css** -- shared styling.
 -   The remaining JavaScript files contain the individual cards.
+-   **custom-rows-extras/** -- one file per expandable element type (extra) of
+    the Custom Rows Card, imported by `ha-custom-cards.js`. `sensors.js` holds
+    both the `sensors` and the `consumption` type. See
+    [Extras files](Documentation/custom-rows-card.md#extras-files).
 -   **Documentation/** -- one configuration guide per card.
 
 The cards are separate components but rely on the shared files. Only
