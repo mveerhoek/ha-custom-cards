@@ -51,7 +51,8 @@ Each extra requires `type` and `entity` (except `sensors`, `consumption` and
   the prompt closes after five seconds. The name is always shown in regular
   weight; the state is indicated by the status icon. Optionally set
   `badge` (see [Badges](#badges)) to show a badge on the entry icon while the
-  switch is on.
+  switch is on; with `use_status: true` in the badge it follows the `status`
+  binary sensor instead of the switch.
 - `cover`: controls a cover (e.g. sunscreen or blinds). The button on the left
   (`mdi:window-open`) toggles between open and closed. Next to it the name is
   shown in bold, with the state and, when the cover reports a position, how far
@@ -186,6 +187,7 @@ entries:
         badge:
           icon: mdi:television
           color: orange
+          use_status: true # badge follows the status sensor instead of the switch
       - type: cover
         entity: cover.living_room_sunscreen
         name: Sunscreen
@@ -271,7 +273,7 @@ extras.
 | :--- | :--- | :--- |
 | Climate (automatic for a `climate` extra) | The climate is heating or cooling | `mdi:heat-wave` in red when heating, `mdi:snowflake` in blue when cooling |
 | Door (`door` option of the entry) | The binary sensor is available | `mdi:door-open` in orange when on (open), `mdi:door` in green when off (closed) |
-| `power_switch` with `badge` | The switch is on | Configured icon and colour |
+| `power_switch` with `badge` | The switch is on, or with `use_status: true` and a `status` sensor: the `status` sensor is on | Configured icon and colour |
 | `media_player` with `badge` | The player is playing | Configured icon and colour |
 
 The `badge` option of a `power_switch` or `media_player` extra is optional; without
@@ -281,3 +283,4 @@ it no badge is shown. It has the following options:
 | :--- | :--- | :--- |
 | `icon` | `mdi:flash` (`power_switch`), `mdi:play` (`media_player`) | Icon of the badge, e.g. `mdi:music-note` |
 | `color` | `var(--primary-color)` | Colour of the circle: any CSS colour (`orange`, `#2196f3`) or Home Assistant variable. The icon itself is always white |
+| `use_status` | `false` | Only for `power_switch`: show the badge while the `status` binary sensor is on instead of while the switch is on. Without a configured `status` sensor this option is ignored and the badge follows the switch |
