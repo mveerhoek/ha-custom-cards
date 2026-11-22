@@ -1,4 +1,6 @@
 // Vereist custom-cards-shared.js (helpers) en custom-cards-shared.css (opmaak).
+// De extra elementen (extras) staan in eigen bestanden: custom-rows-extra-<naam>.js. Laad alleen de
+// bestanden voor de types die je gebruikt; de volgorde van laden maakt niet uit.
 (() => {
   const start = () => {
     const { CardBase, registerCard } = window.CustomCardsShared;
@@ -17,52 +19,12 @@
     const MIN_COLUMN_WIDTH = 160; // px
     const COLUMN_GAP = 20; // px
 
-    // Extra elementen die onder een uitgeklapte regel getoond kunnen worden
-    const EXTRA_TYPES = ["media_player", "climate", "power_switch", "cover", "light", "sensors", "consumption", "bambu_print", "camera"];
-    const DEFAULT_STEP = 0.5; // °C per klik bij een climate
-    const MAX_SENSORS = 8; // maximaal aantal entiteiten bij een sensors-element
-
-    // Verbruik (consumption): waarden in de volgorde van links naar rechts
-    const CONSUMPTION_VALUES = [
-      { key: "energy_import", icon: "mdi:transmission-tower-import", decimals: 1, unit: "kWh" },
-      { key: "energy_export", icon: "mdi:transmission-tower-export", decimals: 1, unit: "kWh" },
-      { key: "gas", icon: "mdi:meter-gas", decimals: 2, unit: "m³" },
-      { key: "water", icon: "mdi:water", decimals: 2, unit: "m³" }
-    ];
-
-    // Bambu Lab-printer (ha-bambulab): alle entiteiten zijn optioneel; een waarde of knop zonder
-    // entiteit wordt niet getoond, een rij zonder waarden verdwijnt
-    const BAMBU_ENTITY_KEYS = [
-      "status", "progress", "camera", "pause", "resume", "stop",
-      "nozzle_temperature", "nozzle_target", "bed_temperature", "bed_target",
-      "speed", "layer", "total_layers", "remaining_time"
-    ];
-
-    // Printstatussen (print_status-sensor) waarin de printer bezig, gepauzeerd of aan het voorbereiden is
-    const BAMBU_PAUSED = ["pause", "paused"];
-    const BAMBU_ACTIVE = ["running", "prepare", ...BAMBU_PAUSED];
-
-    // Zolang de nozzle minstens zo warm is, blijven de waarden-rijen zichtbaar, ook als de printer niet bezig is
-    const BAMBU_NOZZLE_WARM = 35;
-
-    // Een duur in de eenheid van de sensor omgerekend naar minuten (standaard minuten)
-    const MINUTES_PER_UNIT = { s: 1 / 60, min: 1, h: 60, d: 1440 };
-
-    const MEDIA_ICONS = {
-      tv: "mdi:television",
-      speaker: "mdi:speaker",
-      receiver: "mdi:audio-video"
-    };
-
-    const CLIMATE_ICONS = {
-      heat: "mdi:fire",
-      cool: "mdi:snowflake",
-      heat_cool: "mdi:sun-snowflake-variant",
-      auto: "mdi:thermostat-auto",
-      dry: "mdi:water-percent",
-      fan_only: "mdi:fan",
-      off: "mdi:power"
-    };
+    // Extra elementen die onder een uitgeklapte regel getoond kunnen worden. Elk type staat in een eigen
+    // bestand (custom-rows-extra-*.js) dat zich aanmeldt in dit register: type -> { parse, build, ... }.
+    // Een bestand kan later laden dan de kaart; de kaart wacht dan kort (zie _waitForExtras).
+    const registry = (window.CustomRowsExtras ??= new Map());
+    const EXTRAS_EVENT = "custom-rows-extras-changed";
+    const EXTRAS_WAIT = 3000; // ms wachten op een extra-bestand voordat een onbekend type een fout geeft
 
     // Weergave van een ontbrekende of onbeschikbare waarde (een symbool, geen tekst)
     const NO_VALUE = "—";
@@ -70,95 +32,65 @@
     const isAvailable = (state) =>
       !!state && state.state !== "unavailable" && state.state !== "unknown";
 
-    // Wat doet een climate nu? "heating", "cooling" of null (niet actief).
-    // Volgt hvac_action; heeft het toestel dat attribuut niet, dan geldt de ingestelde modus.
-    const climateAction = (state) => {
-      if (!isAvailable(state)) return null;
-
-      const action = state.attributes?.hvac_action ??
-        (state.state === "heat" ? "heating" : state.state === "cool" ? "cooling" : null);
-
-      if (action === "heating" || action === "preheating") return "heating";
-      if (action === "cooling") return "cooling";
-
-      return null;
-    };
-
     // Badges: klein statusicoon in een hoek van het hoofdicoon. Van de getoonde badges staat
     // de eerste rechtsboven, de tweede rechtsonder en de derde rechtsmidden (maximaal 3 badges,
     // alle aan de rechterkant; bij 3 badges overlappen ze elkaar een klein beetje)
-    // (volgorde: climate, deur, daarna de power_switch en media_player badges in de volgorde van de extras).
+    // (volgorde: statusbadges van de extras (climate), deur, daarna de badges uit de configuratie van de extras).
     // resolve geeft { icon, tone, color? } als de badge getoond moet worden, anders null.
     // tone "custom" gebruikt de meegegeven color als achtergrondcirkel.
     const BADGE_SLOTS = ["top-right", "bottom-right", "middle-right"];
 
-    const BADGES = [
-      {
-        applies: (entry) => entry.extras.some((extra) => extra.type === "climate"),
-        resolve: (card, entry) => {
-          for (const extra of entry.extras) {
-            if (extra.type !== "climate") continue;
+    // Deur: binary_sensor, aan = open, uit = dicht; onbekend of niet beschikbaar = geen badge
+    const doorBadge = {
+      resolve: (card, entry) => {
+        const state = card._getState(entry.door);
 
-            const action = climateAction(card._getState(extra.entity));
+        if (!isAvailable(state)) return null;
 
-            if (action === "heating") return { icon: "mdi:heat-wave", tone: "heat" };
-            if (action === "cooling") return { icon: "mdi:snowflake", tone: "cool" };
-          }
-
-          return null;
-        }
-      },
-      {
-        // Deur: binary_sensor, aan = open, uit = dicht; onbekend of niet beschikbaar = geen badge
-        applies: (entry) => !!entry.door,
-        resolve: (card, entry) => {
-          const state = card._getState(entry.door);
-
-          if (!isAvailable(state)) return null;
-
-          return state.state === "on"
-            ? { icon: "mdi:door-open", tone: "door-open" }
-            : { icon: "mdi:door", tone: "door-closed" };
-        }
+        return state.state === "on"
+          ? { icon: "mdi:door-open", tone: "door-open" }
+          : { icon: "mdi:door", tone: "door-closed" };
       }
-    ];
-
-    // Extras met een optionele badge en wanneer die getoond wordt:
-    // - power_switch: zolang de schakelaar aan staat (of, met badge.use_status, zolang de status-sensor aan staat)
-    // - media_player: zolang de speler afspeelt (state "playing")
-    const BADGE_ACTIVE = {
-      power_switch: (state) => state?.state === "on",
-      media_player: (state) => state?.state === "playing"
     };
 
-    // Standaard badge-icoon per type, als de configuratie geen icon opgeeft
-    const BADGE_DEFAULT_ICONS = {
-      power_switch: "mdi:flash",
-      media_player: "mdi:play"
+    // Een extra-type (zie custom-rows-extra-*.js) kan op twee manieren een badge leveren:
+    // - statusBadge(card, extra, helpers): { icon, tone } of null. De badge volgt de status van het
+    //   extra zelf (climate: verwarmen of koelen); van de extras van een regel telt de eerste die iets toont.
+    // - badge { defaultIcon, isActive(state), source?(extra) }: optionele badge uit de configuratie
+    //   (power_switch, media_player), alleen zichtbaar zolang isActive waar is voor de status van de
+    //   entiteit source(extra) (standaard extra.entity).
+    const badgeDefs = (entry) => {
+      const defOf = (extra) => registry.get(extra.type);
+
+      const statusBadge = entry.extras.some((extra) => defOf(extra)?.statusBadge)
+        ? [{
+          resolve: (card) => {
+            for (const extra of entry.extras) {
+              const result = defOf(extra)?.statusBadge?.(card, extra, HELPERS);
+
+              if (result) return result;
+            }
+
+            return null;
+          }
+        }]
+        : [];
+
+      const configured = entry.extras
+        .filter((extra) => defOf(extra)?.badge && extra.badge)
+        .map((extra) => {
+          const { isActive, source } = defOf(extra).badge;
+
+          return {
+            resolve: (card) =>
+              isActive(card._getState(source ? source(extra) : extra.entity))
+                ? { icon: extra.badge.icon, tone: "custom", color: extra.badge.color }
+                : null
+          };
+        });
+
+      return [...statusBadge, ...(entry.door ? [doorBadge] : []), ...configured];
     };
-
-    // De entiteit waarvan de status bepaalt of de badge van een extra getoond wordt. Standaard het
-    // extra zelf; bij een power_switch met badge.use_status en een geconfigureerde status-sensor
-    // (binary_sensor) is dat de status-sensor. Zonder status-sensor geldt use_status niet.
-    const badgeSource = (extra) =>
-      extra.type === "power_switch" && extra.badge?.use_status && extra.status
-        ? extra.status
-        : extra.entity;
-
-    // Alle badges van een regel: de vaste badges (climate, deur) plus een badge per power_switch of
-    // media_player met een badge-configuratie. Zo'n badge is alleen zichtbaar als het extra actief is
-    // (zie BADGE_ACTIVE).
-    const badgeDefs = (entry) => [
-      ...BADGES.filter((def) => def.applies(entry)),
-      ...entry.extras
-        .filter((extra) => BADGE_ACTIVE[extra.type] && extra.badge)
-        .map((extra) => ({
-          resolve: (card) =>
-            BADGE_ACTIVE[extra.type](card._getState(badgeSource(extra)))
-              ? { icon: extra.badge.icon, tone: "custom", color: extra.badge.color }
-              : null
-        }))
-    ];
 
     // Badge van een extra (power_switch of media_player): optioneel object { icon, color, use_status };
     // zonder badge geen badge. Zonder icon geldt het standaardicoon van het type.
@@ -178,8 +110,18 @@
         ? null
         : Number(value);
 
+    // Hulpfuncties die de extra-bestanden van de kaart meekrijgen
+    const HELPERS = { isAvailable, toNumber, NO_VALUE };
+
     class CustomRowsCard extends CardBase {
       setConfig(config) {
+        this._stopWaiting();
+        this._applyConfig(config, false);
+      }
+
+      // Past de configuratie toe. Is een extra-type nog onbekend, dan kan het bestand met dat type nog
+      // laden: de kaart wacht dan (zie _waitForExtras) tenzij extrasFinal gezet is (wachttijd om).
+      _applyConfig(config, extrasFinal) {
         this._configError = null;
         if (!Array.isArray(config.entries) || !config.entries.length) {
           return this._invalidConfig("error.rows_entries");
@@ -208,98 +150,18 @@
 
           const extras = (entry.extras || []).map((extra, extraIndex) => {
             const params = { index: index + 1, extra: extraIndex + 1 };
+            const type = extra && typeof extra.type === "string" ? extra.type : "";
+            const def = registry.get(type);
 
-            if (!extra || !EXTRA_TYPES.includes(extra.type)) {
-              throw { key: "error.rows_extra_type", params };
-            }
+            // Onbekend type: misschien is het bestand met dit type nog niet geladen
+            if (!def) throw { key: "error.rows_extra_type", params, waitFor: !!type };
 
-            // sensors: een lijst met entiteiten (entities) in plaats van één entity. Een item is een
-            // entity_id of een object { entity, icon, icon_off, color, hide_icon, label }; meer dan
-            // MAX_SENSORS items worden genegeerd. Bij een binary_sensor toont het item alleen het label
-            // (niet de status); icon geldt dan voor "on" en icon_off voor "off", en de kleur wordt
-            // alleen getoond zolang de sensor aan staat.
-            if (extra.type === "sensors") {
-              const entities = (Array.isArray(extra.entities) ? extra.entities : [])
-                .map((item) => (typeof item === "string" ? { entity: item } : item))
-                .filter((item) => item && typeof item.entity === "string" && item.entity)
-                .slice(0, MAX_SENSORS)
-                .map((item) => ({
-                  entity: item.entity,
-                  icon: typeof item.icon === "string" && item.icon ? item.icon : undefined, // optioneel: vervangt het nummericoon (bij een binary_sensor: icoon voor "on")
-                  iconOff: typeof item.icon_off === "string" && item.icon_off ? item.icon_off : undefined, // optioneel, alleen binary_sensor: icoon voor "off" (standaard gelijk aan icon)
-                  color: typeof item.color === "string" && item.color.trim() ? item.color.trim() : undefined, // optioneel: kleur van het icoon (bij een binary_sensor alleen bij "on")
-                  hideIcon: item.hide_icon === true, // optioneel: toont geen icoon
-                  label: item.label !== undefined && item.label !== null && item.label !== "" ? String(item.label) : undefined // optioneel: label (normaal)
-                }));
+            const parsed = { ...def.parse(extra, { params }), type };
 
-              if (!entities.length) {
-                throw { key: "error.rows_extra_entity", params };
-              }
+            // Optionele badge uit de configuratie (power_switch, media_player): { icon, color, use_status }
+            if (def.badge) parsed.badge = parseBadge(extra.badge, def.badge.defaultIcon);
 
-              return {
-                type: extra.type,
-                entities,
-                icon: extra.icon, // optioneel: overschrijft mdi:thermometer
-                label: extra.label !== undefined && extra.label !== null && extra.label !== "" ? String(extra.label) : undefined // optioneel: vet label van de rij
-              };
-            }
-
-            // consumption: losse sensoren per soort (energy_import, energy_export, gas, water);
-            // minstens één is nodig, niet geconfigureerde waarden worden niet getoond
-            if (extra.type === "consumption") {
-              const sensors = {};
-
-              CONSUMPTION_VALUES.forEach(({ key }) => {
-                if (typeof extra[key] === "string" && extra[key]) sensors[key] = extra[key];
-              });
-
-              if (!Object.keys(sensors).length) {
-                throw { key: "error.rows_extra_entity", params };
-              }
-
-              return {
-                type: extra.type,
-                ...sensors,
-                icon: extra.icon // optioneel: overschrijft mdi:counter
-              };
-            }
-
-            // bambu_print: losse entiteiten van de ha-bambulab integratie (zie BAMBU_ENTITY_KEYS);
-            // minstens één is nodig
-            if (extra.type === "bambu_print") {
-              const entities = {};
-
-              BAMBU_ENTITY_KEYS.forEach((key) => {
-                if (typeof extra[key] === "string" && extra[key]) entities[key] = extra[key];
-              });
-
-              if (!Object.keys(entities).length) {
-                throw { key: "error.rows_extra_bambu", params };
-              }
-
-              return {
-                type: extra.type,
-                ...entities,
-                name: extra.name, // optioneel: overschrijft de standaardnaam
-                icon: extra.icon // optioneel: overschrijft mdi:printer-3d
-              };
-            }
-
-            if (!extra.entity) {
-              throw { key: "error.rows_extra_entity", params };
-            }
-
-            return {
-              type: extra.type,
-              entity: extra.entity,
-              name: extra.name, // optioneel: overschrijft de naam van de entiteit
-              icon: extra.icon, // optioneel: overschrijft het icoon van de knop
-              step: Number(extra.step) > 0 ? Number(extra.step) : DEFAULT_STEP, // alleen climate
-              power: extra.power, // alleen power_switch: vermogenssensor (optioneel)
-              status: extra.status, // alleen power_switch: binary_sensor (optioneel)
-              switchable: extra.switchable === true, // alleen power_switch: schakelbaar vanuit de kaart
-              badge: BADGE_ACTIVE[extra.type] ? parseBadge(extra.badge, BADGE_DEFAULT_ICONS[extra.type]) : undefined // alleen power_switch en media_player: optionele badge { icon, color }; power_switch toont hem als de schakelaar aan staat, media_player als de speler afspeelt
-            };
+            return parsed;
           });
 
           // state_colors (alleen bij een input_select): lijst van { state, color }; een ongeldig
@@ -328,8 +190,11 @@
 
         } catch (error) {
           if (!error.key) throw error;
+          if (error.waitFor && !extrasFinal) return this._waitForExtras(config);
+          this._stopWaiting();
           return this._invalidConfig(error.key, error.params);
         }
+        this._stopWaiting();
         this._config = {
           css_url: config.css_url, // optioneel: pad naar de gedeelde stylesheet
           entries
@@ -340,13 +205,37 @@
         this._build();
       }
 
+      // Een extra-type staat in een eigen bestand dat later dan deze kaart kan laden. Zodra een
+      // extra-bestand zich aanmeldt wordt de configuratie opnieuw toegepast; is het type na
+      // EXTRAS_WAIT ms nog onbekend, dan volgt de foutmelding.
+      _waitForExtras(config) {
+        if (!this._extrasListener) {
+          this._extrasListener = () => this._applyConfig(config, false);
+          window.addEventListener(EXTRAS_EVENT, this._extrasListener);
+        }
+
+        if (!this._extrasTimer) {
+          this._extrasTimer = setTimeout(() => {
+            this._extrasTimer = null;
+            this._applyConfig(config, true);
+          }, EXTRAS_WAIT);
+        }
+      }
+
+      _stopWaiting() {
+        if (this._extrasListener) window.removeEventListener(EXTRAS_EVENT, this._extrasListener);
+        clearTimeout(this._extrasTimer);
+        this._extrasListener = null;
+        this._extrasTimer = null;
+      }
+
       _invalidConfig(key, params) {
         this._disposeControls();
         return super._invalidConfig(key, params);
       }
 
       connectedCallback() {
-        if (this._disposed) {
+        if (this._disposed && this._config) {
           this._disposed = false;
           this._build();
         } else if (this._observer && this._grid) {
@@ -483,17 +372,7 @@
             extrasEl.className = "entry-extras";
             extrasEl.hidden = true;
 
-            extras = entry.extras.map((extra) => {
-              if (extra.type === "climate") return this._buildClimate(extra);
-              if (extra.type === "power_switch") return this._buildPowerSwitch(extra);
-              if (extra.type === "cover") return this._buildCover(extra);
-              if (extra.type === "light") return this._buildLight(extra);
-              if (extra.type === "sensors") return this._buildSensors(extra);
-              if (extra.type === "consumption") return this._buildConsumption(extra);
-              if (extra.type === "bambu_print") return this._buildBambuPrint(extra);
-              if (extra.type === "camera") return this._buildCamera(extra);
-              return this._buildMedia(extra);
-            });
+            extras = entry.extras.map((extra) => registry.get(extra.type).build(this, extra, HELPERS));
             extrasEl.append(...extras.flatMap((extra) => extra.els || [extra.el]));
             el.append(extrasEl);
 
@@ -953,1370 +832,6 @@
           },
           setPicture
         };
-      }
-
-      // ----- Extra element: mediaspeler -----
-
-      _buildMedia(extra) {
-        const el = document.createElement("div");
-        el.className = "extra";
-
-        const main = document.createElement("div");
-        main.className = "extra-view";
-
-        const volumeView = document.createElement("div");
-        volumeView.className = "extra-view";
-        volumeView.hidden = true;
-
-        const showVolume = (show) => {
-          main.hidden = show;
-          volumeView.hidden = !show;
-        };
-
-        // Hoofdweergave: icoon (more-info) | bron-info | play/pause | volume
-        const info = this._iconButton(() => this._openMoreInfo(extra.entity));
-
-        // Twee regels, net als bij de climate: dik bovenaan, normaal eronder
-        const labels = document.createElement("div");
-        labels.className = "extra-labels";
-
-        const name = document.createElement("div");
-        name.className = "entry-name";
-
-        const status = document.createElement("div");
-        status.className = "extra-status";
-
-        labels.append(name, status);
-
-        const play = this._iconButton(() =>
-          this._callService("media_player", "media_play_pause", { entity_id: extra.entity })
-        );
-
-        const volume = this._iconButton(() => showVolume(true));
-
-        main.append(info.el, labels, play.el, volume.el);
-
-        // Volumeweergave: mute | slider | annuleren
-        const mute = this._iconButton(() => {
-          const muted = this._getState(extra.entity)?.attributes?.is_volume_muted === true;
-
-          this._callService("media_player", "volume_mute", {
-            entity_id: extra.entity,
-            is_volume_muted: !muted
-          });
-        });
-
-        const slider = document.createElement("input");
-        slider.type = "range";
-        slider.min = "0";
-        slider.max = "100";
-        slider.step = "1";
-        slider.className = "volume-slider";
-
-        const cancel = this._iconButton(() => showVolume(false));
-        cancel.setIcon("mdi:close");
-
-        volumeView.append(mute.el, slider, cancel.el);
-        el.append(main, volumeView);
-
-        // Tijdens het slepen overschrijft een statusupdate de slider niet; het volume
-        // wordt hooguit ongeveer 8 keer per seconde doorgegeven.
-        const control = { dragging: false, dragTimer: null, sendTimer: null, level: 0 };
-
-        slider.addEventListener("input", () => {
-          control.dragging = true;
-          clearTimeout(control.dragTimer);
-          control.dragTimer = setTimeout(() => { control.dragging = false; }, 1500);
-
-          control.level = Number(slider.value);
-
-          if (!control.sendTimer) {
-            control.sendTimer = setTimeout(() => {
-              control.sendTimer = null;
-
-              this._callService("media_player", "volume_set", {
-                entity_id: extra.entity,
-                volume_level: control.level / 100
-              });
-            }, 120);
-          }
-        });
-
-        const update = () => {
-          const state = this._getState(extra.entity);
-          const attrs = state?.attributes || {};
-          const active = isAvailable(state) && state.state !== "off";
-
-          info.setIcon(extra.icon || attrs.icon || MEDIA_ICONS[attrs.device_class] || "mdi:speaker");
-
-          // Albumhoes of andere graphic van de speler; zonder graphic blijft het icoon staan
-          const picture = isAvailable(state) ? attrs.entity_picture_local || attrs.entity_picture : null;
-          info.setPicture(picture ? this._resolveUrl(picture) : null);
-
-          // Bovenste regel (dik): titel van het nummer, anders de naam van de speler.
-          // Onderste regel: artiest, anders de bron (bijv. NPO Radio 2), anders de status.
-          const title = attrs.media_title;
-          const artist = attrs.media_artist;
-          const source = attrs.source;
-          const stateText = state ? this._stateText(state) : NO_VALUE;
-
-          const top = title || extra.name || attrs.friendly_name || extra.entity;
-          const bottom = (title && artist) || source || stateText;
-
-          name.textContent = top;
-          name.title = top;
-          status.textContent = bottom;
-          status.title = bottom;
-
-          info.el.setAttribute("aria-label", this._t("rows.more_info", { name: top }));
-          play.el.setAttribute("aria-label", this._t(state?.state === "playing" ? "rows.pause" : "rows.play"));
-          volume.el.setAttribute("aria-label", this._t("rows.volume"));
-          mute.el.setAttribute("aria-label", this._t(attrs.is_volume_muted ? "rows.unmute" : "rows.mute"));
-          slider.setAttribute("aria-label", this._t("rows.volume"));
-          cancel.el.setAttribute("aria-label", this._t("rows.close"));
-          play.setIcon(state?.state === "playing" ? "mdi:pause" : "mdi:play");
-          play.el.disabled = !active;
-
-          const level = toNumber(attrs.volume_level);
-          const volumeIcon = attrs.is_volume_muted === true ? "mdi:volume-off" : "mdi:volume-high";
-          const noVolume = !active || level === null;
-
-          volume.setIcon(volumeIcon);
-          volume.el.disabled = noVolume;
-          mute.setIcon(volumeIcon);
-          mute.el.disabled = noVolume;
-          slider.disabled = noVolume;
-
-          if (!control.dragging && level !== null) {
-            slider.value = String(Math.round(level * 100));
-          }
-        };
-
-        const dispose = () => {
-          clearTimeout(control.dragTimer);
-          if (control.sendTimer) {
-            clearTimeout(control.sendTimer);
-            control.sendTimer = null;
-            this._callService("media_player", "volume_set", { entity_id: extra.entity, volume_level: control.level / 100 });
-          }
-        };
-        return { el, update, dispose };
-      }
-
-      // ----- Extra element: climate -----
-
-      _buildClimate(extra) {
-        const el = document.createElement("div");
-        el.className = "extra";
-
-        const view = document.createElement("div");
-        view.className = "extra-view";
-
-        // Icoon (more-info) | naam boven status | - temperatuur +
-        const info = this._iconButton(() => this._openMoreInfo(extra.entity));
-
-        const labels = document.createElement("div");
-        labels.className = "extra-labels";
-
-        const name = document.createElement("div");
-        name.className = "entry-name";
-
-        const status = document.createElement("div");
-        status.className = "extra-status";
-
-        labels.append(name, status);
-
-        const stepper = document.createElement("div");
-        stepper.className = "stepper";
-
-        const minus = this._iconButton(() => change(-1));
-        minus.setIcon("mdi:minus");
-
-        const value = document.createElement("div");
-        value.className = "stepper-value";
-
-        const plus = this._iconButton(() => change(1));
-        plus.setIcon("mdi:plus");
-
-        stepper.append(minus.el, value, plus.el);
-        view.append(info.el, labels, stepper);
-        el.append(view);
-
-        // Lang indrukken op de rij: uit -> aan, anders -> uit
-        el.classList.add("long-press");
-
-        const disposeLongPress = this._onLongPress(el, () => {
-          const state = this._getState(extra.entity);
-
-          if (!isAvailable(state)) return;
-
-          this._callService("climate", state.state === "off" ? "turn_on" : "turn_off", {
-            entity_id: extra.entity
-          });
-        }, { canStart: () => isAvailable(this._getState(extra.entity)) });
-
-        // Snel achter elkaar klikken: de gekozen waarde wordt direct getoond en na een
-        // korte pauze in één keer doorgegeven aan Home Assistant.
-        const control = { pending: null, sendTimer: null, clearTimer: null, disposed: false };
-
-        const attributes = () => this._getState(extra.entity)?.attributes || {};
-
-        const change = (direction) => {
-          const attrs = attributes();
-          const base = control.pending ?? toNumber(attrs.temperature);
-
-          if (base === null) return;
-
-          let next = Math.round((base + direction * extra.step) / extra.step) * extra.step;
-          next = Math.round(next * 100) / 100;
-
-          const min = toNumber(attrs.min_temp);
-          const max = toNumber(attrs.max_temp);
-
-          if (min !== null) next = Math.max(min, next);
-          if (max !== null) next = Math.min(max, next);
-
-          control.pending = next;
-          clearTimeout(control.clearTimer);
-          clearTimeout(control.sendTimer);
-          update();
-
-          control.sendTimer = setTimeout(async () => {
-            control.sendTimer = null;
-            const target = control.pending;
-
-            await this._callService("climate", "set_temperature", {
-              entity_id: extra.entity,
-              temperature: target
-            });
-
-            if (control.disposed) return;
-            // Even wachten tot de nieuwe status binnen is, daarna volgt het label de entiteit weer
-            control.clearTimer = setTimeout(() => {
-              control.pending = null;
-              update();
-            }, 1500);
-          }, 600);
-        };
-
-        const update = () => {
-          const state = this._getState(extra.entity);
-          const attrs = state?.attributes || {};
-          const available = isAvailable(state);
-
-          name.textContent = extra.name || attrs.friendly_name || extra.entity;
-          status.textContent = state ? this._stateText(state) : NO_VALUE;
-
-          info.el.setAttribute("aria-label", this._t("rows.more_info", { name: name.textContent }));
-          minus.el.setAttribute("aria-label", this._t("rows.decrease_temperature"));
-          plus.el.setAttribute("aria-label", this._t("rows.increase_temperature"));
-          info.setIcon(extra.icon || CLIMATE_ICONS[state?.state] || "mdi:thermostat");
-
-          // Kleur volgens wat het toestel nu doet (hvac_action, anders de ingestelde modus)
-          const action = climateAction(state);
-
-          info.el.classList.toggle("heating", action === "heating");
-          info.el.classList.toggle("cooling", action === "cooling");
-
-          const current = control.pending ?? toNumber(attrs.temperature);
-          const unit = this._hass?.config?.unit_system?.temperature || "°C";
-
-          value.textContent = current === null ? NO_VALUE : `${this._formatNumber1(current)} ${unit}`;
-
-          const min = toNumber(attrs.min_temp);
-          const max = toNumber(attrs.max_temp);
-
-          minus.el.disabled = !available || current === null || (min !== null && current <= min);
-          plus.el.disabled = !available || current === null || (max !== null && current >= max);
-        };
-
-        const dispose = () => {
-          disposeLongPress();
-          control.disposed = true;
-          clearTimeout(control.clearTimer);
-          if (control.sendTimer) {
-            clearTimeout(control.sendTimer);
-            control.sendTimer = null;
-            this._callService("climate", "set_temperature", { entity_id: extra.entity, temperature: control.pending });
-          }
-        };
-        return { el, update, dispose };
-      }
-
-      // ----- Extra element: cover (zonwering) -----
-
-      // Hoofdweergave: [open/dicht] | naam boven status + percentage | [omlaag] [omhoog] [slider]
-      // Sliderweergave: slider over de volle breedte | [terug]
-      _buildCover(extra) {
-        const el = document.createElement("div");
-        el.className = "extra";
-
-        const main = document.createElement("div");
-        main.className = "extra-view";
-
-        const sliderView = document.createElement("div");
-        sliderView.className = "extra-view";
-        sliderView.hidden = true;
-
-        const showSlider = (show) => {
-          main.hidden = show;
-          sliderView.hidden = !show;
-        };
-
-        const call = (service, data = {}) =>
-          this._callService("cover", service, { entity_id: extra.entity, ...data });
-
-        // Links: schakelt tussen open en dicht
-        const info = this._iconButton(() => call("toggle"));
-
-        const labels = document.createElement("div");
-        labels.className = "extra-labels";
-
-        const name = document.createElement("div");
-        name.className = "entry-name";
-
-        const status = document.createElement("div");
-        status.className = "extra-status";
-
-        labels.append(name, status);
-
-        // Rechts: sluiten, openen, naar de slider
-        const buttons = document.createElement("div");
-        buttons.className = "stepper";
-
-        const close = this._iconButton(() => call("close_cover"));
-        close.setIcon("mdi:arrow-down");
-
-        const open = this._iconButton(() => call("open_cover"));
-        open.setIcon("mdi:arrow-up");
-
-        const swipe = this._iconButton(() => showSlider(true));
-        swipe.setIcon("mdi:gesture-swipe-horizontal");
-
-        buttons.append(close.el, open.el, swipe.el);
-        main.append(info.el, labels, buttons);
-
-        // Sliderweergave: slider (percentage open) | terug naar de hoofdweergave
-        const slider = document.createElement("input");
-        slider.type = "range";
-        slider.min = "0";
-        slider.max = "100";
-        slider.step = "1";
-        slider.className = "volume-slider";
-
-        const back = this._iconButton(() => showSlider(false));
-        back.setIcon("mdi:gesture-tap-button");
-
-        sliderView.append(slider, back.el);
-        el.append(main, sliderView);
-
-        // Tijdens het slepen overschrijft een statusupdate de slider niet; de positie wordt
-        // hooguit ongeveer 6 keer per seconde doorgegeven en bij loslaten direct. Na loslaten
-        // toont de slider de gekozen positie tot de cover er is.
-        const control = { dragging: false, dragTimer: null, sendTimer: null, level: 0, target: null, holdUntil: 0 };
-
-        const send = () => {
-          clearTimeout(control.sendTimer);
-          control.sendTimer = null;
-          call("set_cover_position", { position: control.level });
-        };
-
-        slider.addEventListener("input", () => {
-          control.dragging = true;
-          clearTimeout(control.dragTimer);
-          control.dragTimer = setTimeout(() => { control.dragging = false; }, 1500);
-
-          control.level = Number(slider.value);
-          control.target = control.level;
-
-          if (!control.sendTimer) control.sendTimer = setTimeout(send, 150);
-        });
-
-        slider.addEventListener("change", () => {
-          clearTimeout(control.dragTimer);
-          control.dragging = false;
-          control.level = Number(slider.value);
-          control.target = control.level;
-          control.holdUntil = Date.now() + 4000;
-          send();
-        });
-
-        const update = () => {
-          const state = this._getState(extra.entity);
-          const attrs = state?.attributes || {};
-          const available = isAvailable(state);
-          const moving = state?.state === "opening" || state?.state === "closing";
-          const position = toNumber(attrs.current_position);
-          const title = extra.name || attrs.friendly_name || extra.entity;
-
-          name.textContent = title;
-          name.title = title;
-
-          // Status (open, dicht, ...) en daarachter hoe ver de cover open is
-          let text = state ? this._stateText(state) : NO_VALUE;
-          if (available && position !== null) text += ` · ${Math.round(position)}%`;
-
-          status.textContent = text;
-          status.title = text;
-
-          info.setIcon(extra.icon || "mdi:window-open");
-          info.el.disabled = !available;
-
-          const fullyOpen = position !== null ? position >= 100 : state?.state === "open";
-
-          close.el.disabled = !available || (!moving && state.state === "closed");
-          open.el.disabled = !available || (!moving && fullyOpen);
-          swipe.el.disabled = !available || position === null;
-          slider.disabled = !available || position === null;
-
-          info.el.setAttribute("aria-label", `${this._t("rows.cover_toggle")}: ${title}`);
-          close.el.setAttribute("aria-label", this._t("rows.cover_close"));
-          open.el.setAttribute("aria-label", this._t("rows.cover_open"));
-          swipe.el.setAttribute("aria-label", this._t("rows.cover_slider"));
-          slider.setAttribute("aria-label", this._t("rows.position"));
-          back.el.setAttribute("aria-label", this._t("rows.back"));
-
-          const holding = control.target !== null && (moving || Date.now() < control.holdUntil);
-
-          if (!holding && !control.dragging) control.target = null;
-
-          if (!control.dragging && position !== null) {
-            slider.value = String(Math.round(holding ? control.target : position));
-          }
-        };
-
-        const dispose = () => {
-          clearTimeout(control.dragTimer);
-          if (control.sendTimer) send();
-        };
-
-        return { el, update, dispose };
-      }
-
-      // ----- Extra element: lichtbron -----
-
-      // Hoofdweergave: icoon (kleur van de lamp) | naam | [helderheid] [kleur] [schakelaar]
-      // Sliderweergave: helderheidsslider over de volle breedte | [terug]
-      _buildLight(extra) {
-        const COLOR_MODES = ["hs", "xy", "rgb", "rgbw", "rgbww", "color_temp"];
-
-        const el = document.createElement("div");
-        el.className = "extra extra-power extra-light";
-
-        const view = document.createElement("div");
-        view.className = "extra-view";
-
-        const sliderView = document.createElement("div");
-        sliderView.className = "extra-view";
-        sliderView.hidden = true;
-
-        const showSlider = (show) => {
-          view.hidden = show;
-          sliderView.hidden = !show;
-        };
-
-        // Icoon: grijs als de lamp uit is, anders de kleur van de lamp (of oranje)
-        const iconWrap = document.createElement("div");
-        iconWrap.className = "power-icon light-icon";
-
-        const iconName = extra.icon || "mdi:lightbulb";
-        const icon = document.createElement("ha-icon");
-        icon.icon = iconName;
-        iconWrap.append(icon);
-
-        const labels = document.createElement("div");
-        labels.className = "extra-labels";
-
-        const name = document.createElement("div");
-        name.className = "entry-name";
-
-        // Tweede regel (niet vet): helderheid in procenten, alleen bij dimbare lampen
-        const intensity = document.createElement("div");
-        intensity.className = "extra-status";
-        intensity.hidden = true;
-
-        labels.append(name, intensity);
-
-        const right = document.createElement("div");
-        right.className = "extra-right";
-
-        // Helderheid: toont de slider in plaats van de rij (alleen bij dimbare lampen)
-        const dim = this._iconButton(() => showSlider(true));
-        dim.setIcon("mdi:gesture-swipe-horizontal");
-        dim.el.hidden = true;
-
-        // Kleur: vierkant vlak in de huidige kleur van de lamp; opent het standaard
-        // Home Assistant-venster van de lamp (alleen bij lampen met kleurkeuze)
-        const color = this._iconButton(() => this._openMoreInfo(extra.entity));
-        color.el.classList.add("color-btn");
-        color.el.hidden = true;
-
-        const swatch = document.createElement("span");
-        swatch.className = "color-swatch";
-        color.el.append(swatch);
-
-        // Schakelaar: groen als aan, grijs als uit
-        const toggle = document.createElement("span");
-        toggle.className = "power-toggle switchable";
-        toggle.setAttribute("role", "switch");
-        toggle.setAttribute("tabindex", "0");
-
-        const toggleIcon = document.createElement("ha-icon");
-        toggle.append(toggleIcon);
-
-        this._onActivate(toggle, () => this._toggle(extra.entity), { stopPropagation: true });
-
-        right.append(dim.el, color.el, toggle);
-        view.append(iconWrap, labels, right);
-
-        // Sliderweergave: helderheid in procenten | terug naar de hoofdweergave
-        const slider = document.createElement("input");
-        slider.type = "range";
-        slider.min = "0";
-        slider.max = "100";
-        slider.step = "1";
-        slider.className = "volume-slider";
-
-        const back = this._iconButton(() => showSlider(false));
-        back.setIcon("mdi:gesture-tap-button");
-
-        sliderView.append(slider, back.el);
-        el.append(view, sliderView);
-
-        // Zelfde aanpak als bij de zonwering: tijdens het slepen overschrijft een update de
-        // slider niet, de waarde wordt gedoseerd doorgegeven en bij loslaten direct; daarna
-        // blijft de gekozen waarde even staan tot de lamp bijgewerkt is. 0% schakelt uit.
-        const control = { dragging: false, dragTimer: null, sendTimer: null, level: 0, target: null, holdUntil: 0 };
-
-        const send = () => {
-          clearTimeout(control.sendTimer);
-          control.sendTimer = null;
-
-          if (control.level <= 0) {
-            this._callService("light", "turn_off", { entity_id: extra.entity });
-          } else {
-            this._callService("light", "turn_on", { entity_id: extra.entity, brightness_pct: control.level });
-          }
-        };
-
-        slider.addEventListener("input", () => {
-          control.dragging = true;
-          clearTimeout(control.dragTimer);
-          control.dragTimer = setTimeout(() => { control.dragging = false; }, 1500);
-
-          control.level = Number(slider.value);
-          control.target = control.level;
-
-          if (!control.sendTimer) control.sendTimer = setTimeout(send, 150);
-        });
-
-        slider.addEventListener("change", () => {
-          clearTimeout(control.dragTimer);
-          control.dragging = false;
-          control.level = Number(slider.value);
-          control.target = control.level;
-          control.holdUntil = Date.now() + 2000;
-          send();
-        });
-
-        const update = () => {
-          const state = this._getState(extra.entity);
-          const attrs = state?.attributes || {};
-          const available = !!state && state.state !== "unavailable";
-          const isOn = state?.state === "on";
-          const text = extra.name || attrs.friendly_name || extra.entity;
-
-          name.textContent = text;
-          name.title = text;
-
-          if (icon.icon !== iconName) icon.icon = iconName;
-
-          // Uit: grijs (CSS). Aan: kleur van de lamp (rgb_color); heeft de entiteit die niet
-          // (bijv. een switch), dan oranje.
-          const rgb = attrs.rgb_color;
-          const hasRgb = isOn && Array.isArray(rgb) && rgb.length === 3 &&
-            rgb.every((part) => Number.isFinite(Number(part)));
-          const lampColor = hasRgb
-            ? `rgb(${rgb.map((part) => Math.round(Number(part))).join(", ")})`
-            : isOn ? "var(--cc-switch-color)" : "";
-
-          iconWrap.style.color = lampColor;
-
-          // Welke bediening de lamp ondersteunt
-          const modes = Array.isArray(attrs.supported_color_modes) ? attrs.supported_color_modes : [];
-          const canColor = modes.some((mode) => COLOR_MODES.includes(mode));
-          const canDim = modes.some((mode) => mode !== "onoff" && mode !== "unknown");
-
-          color.el.hidden = !canColor;
-          dim.el.hidden = !canDim;
-
-          if (!canDim && !sliderView.hidden) showSlider(false);
-
-          swatch.style.background = lampColor || "var(--disabled-text-color, #bdbdbd)";
-
-          color.el.disabled = !available;
-          dim.el.disabled = !available;
-          slider.disabled = !available;
-
-          color.el.setAttribute("aria-label", this._t("rows.color"));
-          dim.el.setAttribute("aria-label", this._t("rows.brightness"));
-          slider.setAttribute("aria-label", this._t("rows.brightness"));
-          back.el.setAttribute("aria-label", this._t("rows.back"));
-
-          // Helderheid in procenten (uit = 0)
-          const brightness = Number(attrs.brightness);
-          const level = isOn && Number.isFinite(brightness) ? Math.round((brightness / 255) * 100) : 0;
-          const holding = control.target !== null && Date.now() < control.holdUntil;
-
-          if (!holding && !control.dragging) control.target = null;
-
-          if (!control.dragging) slider.value = String(holding ? control.target : level);
-
-          intensity.hidden = !canDim;
-
-          const intensityText = available ? `${level}%` : NO_VALUE;
-
-          intensity.textContent = intensityText;
-          intensity.title = intensityText;
-
-          const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
-
-          if (toggleIcon.icon !== toggleName) toggleIcon.icon = toggleName;
-
-          toggle.classList.toggle("on", isOn);
-          toggle.classList.toggle("unavailable", !available);
-          toggle.title = state ? this._stateText(state) : NO_VALUE;
-          toggle.setAttribute("aria-checked", String(isOn));
-          toggle.setAttribute("aria-label", text);
-        };
-
-        const dispose = () => {
-          clearTimeout(control.dragTimer);
-          if (control.sendTimer) send();
-        };
-
-        return { el, update, dispose };
-      }
-
-      // ----- Extra element: sensoren -----
-
-      // Compacte rij: icoon | [label van de rij, vet] | per item [icoon] [label] waarde
-      // Het label van de rij is optioneel en staat rechts van het hoofdicoon. Het icoon van een item
-      // is standaard mdi:numeric-n-box (n = positie in de lijst), per item te vervangen of te
-      // verbergen. Het label van een item is optioneel en normaal van gewicht. De waarde neemt de eenheid van de entiteit
-      // over. De eerste entiteit staat links, de laatste rechts (maximaal 8).
-      _buildSensors(extra) {
-        const el = document.createElement("div");
-        el.className = "extra extra-power extra-sensors";
-
-        const view = document.createElement("div");
-        view.className = "extra-view";
-
-        const iconWrap = document.createElement("div");
-        iconWrap.className = "power-icon";
-
-        const icon = document.createElement("ha-icon");
-        icon.icon = extra.icon || "mdi:thermometer";
-        iconWrap.append(icon);
-
-        let rowLabel = null;
-
-        if (extra.label) {
-          rowLabel = document.createElement("div");
-          rowLabel.className = "entry-name";
-          rowLabel.textContent = extra.label;
-          rowLabel.title = extra.label;
-        }
-
-        const right = document.createElement("div");
-        right.className = "extra-right";
-
-        const items = extra.entities.map(({ entity, icon: iconOverride, iconOff, color, hideIcon, label }, index) => {
-          const item = document.createElement("span");
-          const isBinary = entity.startsWith("binary_sensor.");
-          const defaultIcon = iconOverride || `mdi:numeric-${index + 1}-box`;
-          let itemIcon = null;
-
-          item.className = "sensor-item";
-
-          if (!hideIcon) {
-            itemIcon = document.createElement("ha-icon");
-            itemIcon.icon = defaultIcon;
-            // Een gewone sensor heeft altijd de geconfigureerde kleur; een binary sensor pas bij "on"
-            if (color && !isBinary) itemIcon.style.color = color;
-            item.append(itemIcon);
-          }
-
-          if (label) {
-            const labelEl = document.createElement("span");
-            labelEl.className = "sensor-label";
-            labelEl.textContent = label;
-            item.append(labelEl);
-          }
-
-          const value = document.createElement("span");
-
-          item.append(value);
-          this._makeClickable(item, entity);
-          right.append(item);
-
-          return { entityId: entity, item, value, itemIcon, isBinary, iconOn: defaultIcon, iconOff: iconOff || defaultIcon, color };
-        });
-
-        if (rowLabel) view.append(iconWrap, rowLabel, right);
-        else view.append(iconWrap, right);
-        el.append(view);
-
-        const update = () => {
-          items.forEach(({ entityId, item, value, itemIcon, isBinary, iconOn, iconOff, color }) => {
-            const state = this._getState(entityId);
-
-            // Binary sensor: alleen het label tonen, geen status
-            const text = isBinary ? "" : this._formatEntity(entityId);
-
-            if (value.textContent !== text) value.textContent = text;
-            value.hidden = isBinary;
-
-            if (isBinary && itemIcon) {
-              const isOn = state?.state === "on";
-              const name = isOn ? iconOn : iconOff;
-
-              if (itemIcon.icon !== name) itemIcon.icon = name;
-
-              // Uit (of onbekend): standaard grijs; de kleur alleen bij aan
-              if (isOn && color) itemIcon.style.color = color;
-              else itemIcon.style.removeProperty("color");
-
-              itemIcon.style.opacity = isAvailable(state) ? "" : "0.5";
-            }
-
-            const title = this._getState(entityId)?.attributes?.friendly_name;
-
-            if (title) item.title = title;
-          });
-        };
-
-        return { el, update };
-      }
-
-      // ----- Extra element: verbruik -----
-
-      // Compacte rij: teller (zonder label) | [import] [export] [gas] [water]
-      // Alleen de geconfigureerde waarden worden getoond, altijd in deze volgorde.
-      _buildConsumption(extra) {
-        const el = document.createElement("div");
-        el.className = "extra extra-power extra-consumption";
-
-        const view = document.createElement("div");
-        view.className = "extra-view";
-
-        const iconWrap = document.createElement("div");
-        iconWrap.className = "power-icon";
-
-        const icon = document.createElement("ha-icon");
-        icon.icon = extra.icon || "mdi:counter";
-        iconWrap.append(icon);
-
-        const right = document.createElement("div");
-        right.className = "extra-right";
-
-        const items = CONSUMPTION_VALUES.filter((def) => extra[def.key]).map((def) => {
-          const item = document.createElement("span");
-          item.className = "consumption-item";
-
-          const itemIcon = document.createElement("ha-icon");
-          itemIcon.icon = def.icon;
-
-          const value = document.createElement("span");
-
-          item.append(itemIcon, value);
-          this._makeClickable(item, extra[def.key]);
-          right.append(item);
-
-          return { def, item, value };
-        });
-
-        view.append(iconWrap, right);
-        el.append(view);
-
-        const update = () => {
-          items.forEach(({ def, item, value }) => {
-            const entityId = extra[def.key];
-            const text = this._formatValue(entityId, def.decimals, def.unit);
-
-            if (value.textContent !== text) value.textContent = text;
-
-            const title = this._getState(entityId)?.attributes?.friendly_name;
-
-            if (title) item.title = title;
-          });
-        };
-
-        return { el, update };
-      }
-
-      // ----- Extra element: Bambu Lab-printer -----
-
-      // Meerdere rijen onder elkaar, elk een gewoon extra-element:
-      // - kop: printericoon (oranje tijdens printen) | naam boven status (+ voortgang) | [camera] [pauze/hervat] [stop]
-      // - temperaturen: nozzle "huidig / target" en bed "huidig / target"
-      // - voortgang: laag "huidig / totaal", resterende tijd en printsnelheid
-      // Stoppen vraagt om bevestiging, net als het uitschakelen van een power_switch.
-      _buildBambuPrint(extra) {
-        const number = (entityId) => (entityId ? this._getNumber(entityId) : null);
-
-        const format = (value, decimals) => {
-          try {
-            return value.toLocaleString(this._language, {
-              minimumFractionDigits: decimals,
-              maximumFractionDigits: decimals
-            });
-          } catch (err) {
-            return value.toFixed(decimals);
-          }
-        };
-
-        // "huidig / target" van de geconfigureerde entiteiten; ontbrekende waarden als NO_VALUE
-        const pairText = (entityIds, decimals) => {
-          const ids = entityIds.filter(Boolean);
-          const texts = ids.map((entityId) => {
-            const value = number(entityId);
-            return value === null ? NO_VALUE : format(value, decimals);
-          });
-
-          return texts.every((text) => text === NO_VALUE) ? NO_VALUE : texts.join(" / ");
-        };
-
-        const temperatureText = (currentId, targetId) => {
-          const text = pairText([currentId, targetId], 0);
-
-          return text === NO_VALUE ? text : `${text} ${this._getUnit(currentId || targetId, "°C")}`;
-        };
-
-        const durationText = (entityId) => {
-          const value = number(entityId);
-
-          if (value === null) return NO_VALUE;
-
-          const unit = this._getState(entityId)?.attributes?.unit_of_measurement;
-          const minutes = Math.max(0, Math.round(value * (MINUTES_PER_UNIT[unit] ?? 1)));
-          const hours = Math.floor(minutes / 60);
-          const rest = `${minutes % 60} ${this._t("rows.bambu_minutes_short")}`;
-
-          return hours ? `${hours} ${this._t("rows.bambu_hours_short")} ${rest}` : rest;
-        };
-
-        const press = (entityId) => this._callService("button", "press", { entity_id: entityId });
-
-        // ----- Kop -----
-
-        const header = document.createElement("div");
-        header.className = "extra extra-power";
-
-        const view = document.createElement("div");
-        view.className = "extra-view";
-
-        const iconWrap = document.createElement("div");
-        iconWrap.className = "power-icon";
-
-        const icon = document.createElement("ha-icon");
-        icon.icon = extra.icon || "mdi:printer-3d";
-        iconWrap.append(icon);
-
-        const labels = document.createElement("div");
-        labels.className = "extra-labels";
-
-        const name = document.createElement("div");
-        name.className = "entry-name";
-
-        const status = document.createElement("div");
-        status.className = "extra-status";
-        status.hidden = !extra.status && !extra.progress;
-
-        labels.append(name, status);
-
-        const right = document.createElement("div");
-        right.className = "extra-right";
-
-        const camera = extra.camera ? this._iconButton(() => this._openMoreInfo(extra.camera)) : null;
-        const pause = extra.pause ? this._iconButton(() => ask(pause, extra.pause, "rows.bambu_confirm_pause")) : null;
-        const resume = extra.resume ? this._iconButton(() => ask(resume, extra.resume, "rows.bambu_confirm_resume")) : null;
-        const stop = extra.stop ? this._iconButton(() => ask(stop, extra.stop, "rows.bambu_confirm_stop")) : null;
-
-        camera?.setIcon("mdi:video");
-        pause?.setIcon("mdi:pause");
-        resume?.setIcon("mdi:play");
-        stop?.setIcon("mdi:stop");
-
-        right.append(...[camera, pause, resume, stop].filter(Boolean).map((button) => button.el));
-        view.append(iconWrap, labels, right);
-
-        // Bevestiging voor pauzeren, hervatten en stoppen: vervangt de kop tijdelijk door een vraag met
-        // een kruis en een vink. Eén bevestiging voor alle drie; `pending` onthoudt voor welke knop.
-        let confirm = null;
-        let confirmView = null;
-        let pending = null;
-
-        const ask = (button, entityId, questionKey) => {
-          pending = { button, entityId };
-          confirm?.show(this._t(questionKey));
-        };
-
-        if (pause || resume || stop) {
-          confirmView = document.createElement("div");
-          confirmView.className = "extra-view";
-          confirmView.hidden = true;
-
-          const confirmLabels = document.createElement("div");
-          confirmLabels.className = "extra-labels";
-
-          confirm = this._rowConfirm({
-            cells: [view],
-            wrapper: confirmView,
-            textClass: "entry-name",
-            onConfirm: () => pending && press(pending.entityId)
-          });
-
-          confirm.cells[0].style.fontWeight = "400";
-          confirmLabels.append(confirm.cells[0]);
-          confirmView.append(confirmLabels, confirm.cells[1], confirm.cells[2]);
-        }
-
-        header.append(view);
-        if (confirmView) header.append(confirmView);
-
-        // ----- Rijen met waarden -----
-
-        // Rij van icoon + waarden (zelfde opmaak als het sensors-element); zonder waarden geen rij
-        const makeRow = (rowIcon, defs) => {
-          const configured = defs.filter((def) => def.entity);
-
-          if (!configured.length) return null;
-
-          const el = document.createElement("div");
-          el.className = "extra extra-power extra-sensors";
-
-          const rowView = document.createElement("div");
-          rowView.className = "extra-view";
-
-          const rowIconWrap = document.createElement("div");
-          rowIconWrap.className = "power-icon";
-
-          const rowIconEl = document.createElement("ha-icon");
-          rowIconEl.icon = rowIcon;
-          rowIconWrap.append(rowIconEl);
-
-          const rowRight = document.createElement("div");
-          rowRight.className = "extra-right";
-
-          const items = configured.map((def) => {
-            const item = document.createElement("span");
-            item.className = "sensor-item";
-
-            const itemIcon = document.createElement("ha-icon");
-            itemIcon.icon = def.icon;
-
-            const value = document.createElement("span");
-
-            item.append(itemIcon, value);
-            this._makeClickable(item, def.entity);
-            rowRight.append(item);
-
-            return { def, item, value };
-          });
-
-          rowView.append(rowIconWrap, rowRight);
-          el.append(rowView);
-
-          return { el, items, iconWrap: rowIconWrap, icon: rowIconEl };
-        };
-
-        const temperatures = makeRow("mdi:thermometer", [
-          {
-            entity: extra.nozzle_temperature || extra.nozzle_target,
-            icon: "mdi:printer-3d-nozzle-heat",
-            text: () => temperatureText(extra.nozzle_temperature, extra.nozzle_target)
-          },
-          {
-            entity: extra.bed_temperature || extra.bed_target,
-            icon: "mdi:heating-coil",
-            text: () => temperatureText(extra.bed_temperature, extra.bed_target)
-          }
-        ]);
-
-        const progress = makeRow("mdi:progress-clock", [
-          {
-            entity: extra.layer || extra.total_layers,
-            icon: "mdi:layers-outline",
-            text: () => pairText([extra.layer, extra.total_layers], 0)
-          },
-          {
-            entity: extra.remaining_time,
-            icon: "mdi:timer-sand",
-            text: () => durationText(extra.remaining_time)
-          },
-          {
-            entity: extra.speed,
-            icon: "mdi:speedometer",
-            text: () => this._formatEntity(extra.speed)
-          }
-        ]);
-
-        // Past drie waarden niet naast elkaar, dan lopen ze door op een tweede regel
-        if (progress) {
-          const progressRight = progress.el.querySelector(".extra-right");
-
-          progressRight.style.flexWrap = "wrap";
-          progressRight.style.justifyContent = "flex-end";
-        }
-
-        const rows = [temperatures, progress].filter(Boolean);
-
-        // De iconen van de waarden-rijen springen in: de linkerkant van het icoon zelf komt onder de
-        // linkerkant van de tekst in de kop te staan. De afstand wordt gemeten (icoon + tussenruimte
-        // van de kop, min de ruimte tussen de rand van het icoonvlak en het icoon) en opnieuw bepaald
-        // als de kaart van grootte verandert, bijvoorbeeld bij het uitklappen.
-        const indent = () => {
-          const iconBox = iconWrap.getBoundingClientRect();
-          const textBox = labels.getBoundingClientRect();
-
-          if (!iconBox.width || !textBox.width) return;
-
-          rows.forEach((row) => {
-            const wrapBox = row.iconWrap.getBoundingClientRect();
-            const glyphBox = row.icon.getBoundingClientRect();
-
-            // Een verborgen rij heeft geen afmetingen; die wordt bij het tonen opnieuw uitgelijnd
-            if (!wrapBox.width || !glyphBox.width) return;
-
-            const inset = glyphBox.left - wrapBox.left;
-            const offset = `${Math.max(0, Math.round(textBox.left - iconBox.left - inset))}px`;
-
-            if (row.iconWrap.style.marginLeft !== offset) row.iconWrap.style.marginLeft = offset;
-          });
-        };
-
-        const resizeObserver = typeof ResizeObserver === "function" && rows.length ? new ResizeObserver(indent) : null;
-
-        resizeObserver?.observe(header);
-
-        const update = () => {
-          const state = extra.status ? this._getState(extra.status) : null;
-          const phase = isAvailable(state) ? state.state : null;
-          const paused = BAMBU_PAUSED.includes(phase);
-          const running = phase === "running";
-          const active = BAMBU_ACTIVE.includes(phase);
-          const text = extra.name || this._t("rows.bambu_default_name");
-
-          name.textContent = text;
-          name.title = text;
-
-          // Tweede regel: status, bij een lopende print aangevuld met de voortgang
-          const parts = [];
-
-          if (extra.status) parts.push(state ? this._stateText(state) : NO_VALUE);
-
-          const percent = number(extra.progress);
-
-          if (percent !== null && (active || !extra.status)) parts.push(`${format(Math.round(percent), 0)}%`);
-
-          const statusText = parts.join(" · ");
-
-          status.textContent = statusText;
-          status.title = statusText;
-
-          // Printericoon: oranje tijdens het printen, geel als de print gepauzeerd is, anders grijs
-          iconWrap.style.color = running ? "var(--cc-switch-color)" : paused ? "var(--warning-color, #ffa600)" : "";
-
-          // Met een status is er één pauze/hervat-knop (de ene vervangt de andere); zonder status
-          // staan beide knoppen er en kan alleen de beschikbaarheid van de knop-entiteit bepalen
-          const canSwitch = !!extra.status;
-          // Knop-entiteiten staan van zichzelf op "unknown" tot ze voor het eerst zijn ingedrukt;
-          // alleen een ontbrekende of "unavailable" entiteit maakt de knop onbruikbaar
-          const isUsable = (entityId) => {
-            const entityState = this._getState(entityId);
-
-            return !!entityState && entityState.state !== "unavailable";
-          };
-
-          if (camera) {
-            camera.el.disabled = !isUsable(extra.camera);
-            camera.el.setAttribute("aria-label", this._t("rows.bambu_camera"));
-          }
-
-          if (pause) {
-            pause.el.hidden = !!resume && canSwitch && paused;
-            pause.el.disabled = !isUsable(extra.pause) || (canSwitch && !running);
-            pause.el.setAttribute("aria-label", this._t("rows.bambu_pause"));
-          }
-
-          if (resume) {
-            resume.el.hidden = !!pause && canSwitch && !paused;
-            resume.el.disabled = !isUsable(extra.resume) || (canSwitch && !paused);
-            resume.el.setAttribute("aria-label", this._t("rows.bambu_resume"));
-          }
-
-          if (stop) {
-            stop.el.disabled = !isUsable(extra.stop) || (canSwitch && !active);
-            stop.el.setAttribute("aria-label", this._t("rows.bambu_stop"));
-          }
-
-          // Kan de gevraagde actie niet meer (bijvoorbeeld omdat de print klaar is), dan vervalt de vraag
-          if (confirm?.isShown() && (!pending || pending.button.el.disabled || pending.button.el.hidden)) confirm.hide();
-
-          // De waarden-rijen zijn alleen relevant als de printer bezig is of de nozzle nog warm is.
-          // Zonder status-entiteit is dat niet te bepalen en blijven ze altijd zichtbaar.
-          const nozzle = number(extra.nozzle_temperature);
-          const hideRows = !!extra.status && !active && !(nozzle !== null && nozzle >= BAMBU_NOZZLE_WARM);
-
-          rows.forEach(({ el }) => {
-            el.hidden = hideRows;
-            el.style.display = hideRows ? "none" : "";
-          });
-
-          rows.forEach(({ items }) => items.forEach(({ def, item, value }) => {
-            const valueText = def.text();
-
-            if (value.textContent !== valueText) value.textContent = valueText;
-
-            const title = this._getState(def.entity)?.attributes?.friendly_name;
-
-            if (title) item.title = title;
-          }));
-
-          // Na het tonen of verbergen van de rijen, want alleen zichtbare rijen zijn te meten
-          indent();
-        };
-
-        return {
-          el: header,
-          els: [header, ...rows.map((row) => row.el)],
-          update,
-          dispose: () => {
-            resizeObserver?.disconnect();
-            confirm?.dispose();
-          }
-        };
-      }
-
-      // ----- Extra element: camera -----
-
-      // Compacte rij (zelfde opmaak als de kop van de Bambu-printer): icoon | naam | [camera]
-      // De knop rechts opent de stream van de camera-entiteit (het more-info-venster), net als de
-      // camera-knop bij bambu_print.
-      _buildCamera(extra) {
-        const el = document.createElement("div");
-        el.className = "extra extra-power";
-
-        const view = document.createElement("div");
-        view.className = "extra-view";
-
-        const iconWrap = document.createElement("div");
-        iconWrap.className = "power-icon";
-
-        const icon = document.createElement("ha-icon");
-        icon.icon = extra.icon || "mdi:camera";
-        iconWrap.append(icon);
-
-        const labels = document.createElement("div");
-        labels.className = "extra-labels";
-
-        const name = document.createElement("div");
-        name.className = "entry-name";
-        labels.append(name);
-
-        const right = document.createElement("div");
-        right.className = "extra-right";
-
-        const camera = this._iconButton(() => this._openMoreInfo(extra.entity));
-        camera.setIcon("mdi:video");
-        right.append(camera.el);
-
-        view.append(iconWrap, labels, right);
-        el.append(view);
-
-        const update = () => {
-          const state = this._getState(extra.entity);
-          const text = extra.name || state?.attributes?.friendly_name || extra.entity;
-
-          name.textContent = text;
-          name.title = text;
-
-          // Zoals bij bambu_print: alleen een ontbrekende of "unavailable" camera maakt de knop onbruikbaar
-          camera.el.disabled = !state || state.state === "unavailable";
-          camera.el.setAttribute("aria-label", this._t("rows.camera_open"));
-        };
-
-        return { el, update };
-      }
-
-      // ----- Extra element: stroomschakelaar -----
-
-      // Compacte rij: icoon | naam (normaal gewicht) | vermogen | status binary sensor | schakelaar
-      _buildPowerSwitch(extra) {
-        const el = document.createElement("div");
-        el.className = "extra extra-power";
-
-        const view = document.createElement("div");
-        view.className = "extra-view";
-
-        // Icoon: altijd grijs
-        const iconWrap = document.createElement("div");
-        iconWrap.className = "power-icon";
-
-        const icon = document.createElement("ha-icon");
-        icon.icon = extra.icon || "mdi:power-socket-eu";
-        iconWrap.append(icon);
-
-        const labels = document.createElement("div");
-        labels.className = "extra-labels";
-
-        const name = document.createElement("div");
-        name.className = "entry-name";
-        // Altijd normaal gewicht: de status wordt al getoond met het statusicoon
-        name.style.fontWeight = "400";
-        labels.append(name);
-
-        const right = document.createElement("div");
-        right.className = "extra-right";
-
-        let power = null;
-
-        if (extra.power) {
-          power = document.createElement("span");
-          power.className = "extra-value";
-          this._makeClickable(power, extra.power);
-          right.append(power);
-        }
-
-        // Standaardicoon van de binary sensor (afhankelijk van device class en status)
-        let statusWrap = null;
-        let statusIcon = null;
-        const hasStateIcon = !!customElements.get("ha-state-icon");
-
-        if (extra.status) {
-          statusWrap = document.createElement("span");
-          statusWrap.className = "extra-state-icon";
-
-          statusIcon = document.createElement(hasStateIcon ? "ha-state-icon" : "ha-icon");
-          statusWrap.append(statusIcon);
-
-          this._makeClickable(statusWrap, extra.status);
-          right.append(statusWrap);
-        }
-
-        // Schakelaar aan het eind van de rij: toont altijd de status van de switch,
-        // en is alleen klikbaar met switchable: true
-        const toggle = document.createElement("span");
-        toggle.className = "power-toggle";
-
-        const toggleIcon = document.createElement("ha-icon");
-        toggle.append(toggleIcon);
-
-        if (extra.switchable) {
-          toggle.classList.add("switchable");
-          toggle.setAttribute("role", "switch");
-          toggle.setAttribute("tabindex", "0");
-
-          this._onActivate(toggle, () => requestToggle(), { stopPropagation: true });
-        }
-
-        right.append(toggle);
-
-        view.append(iconWrap, labels, right);
-
-        // Bevestiging: vervangt de rij tijdelijk door "<naam> uitschakelen?" met een vink en een kruis
-        const confirmView = document.createElement("div");
-        confirmView.className = "extra-view";
-        confirmView.hidden = true;
-
-        const confirmLabels = document.createElement("div");
-        confirmLabels.className = "extra-labels";
-
-        // Vraag van de bevestiging (volgt de taal van Home Assistant)
-        const confirmQuestion = () =>
-          this._t("rows.confirm_off", {
-            name: extra.name || this._getState(extra.entity)?.attributes?.friendly_name || extra.entity
-          });
-
-        // Bevestiging via de gedeelde helper (_rowConfirm in custom-cards-shared.js):
-        // vervangt de rij (view) door de vraag met kruis en vink en keert na 5 seconden vanzelf terug
-        const confirm = this._rowConfirm({
-          cells: [view],
-          wrapper: confirmView,
-          textClass: "entry-name",
-          onConfirm: () => this._toggle(extra.entity)
-        });
-
-        confirm.cells[0].style.fontWeight = "400";
-        confirmLabels.append(confirm.cells[0]);
-        confirmView.append(confirmLabels, confirm.cells[1], confirm.cells[2]);
-        el.append(view, confirmView);
-
-        // Uitschakelen vraagt om bevestiging zolang de binary sensor aan staat;
-        // aanzetten, of uitzetten terwijl de binary sensor uit staat, gaat direct.
-        const requestToggle = () => {
-          const state = this._getState(extra.entity);
-
-          if (!this._hass || !state || state.state === "unavailable") return;
-
-          if (state.state === "on" && extra.status && this._getState(extra.status)?.state === "on") {
-            confirm.show(confirmQuestion());
-          } else {
-            this._toggle(extra.entity);
-          }
-        };
-
-        const update = () => {
-          const state = this._getState(extra.entity);
-          const isOn = state?.state === "on";
-          const text = extra.name || state?.attributes?.friendly_name || extra.entity;
-
-          name.textContent = text;
-          name.title = text;
-
-          if (confirm.isShown()) confirm.setQuestion(confirmQuestion());
-
-          // Is de schakelaar al uit of de binary sensor inmiddels uit, dan vervalt de vraag
-          if (confirm.isShown() && (!isOn || !extra.status || this._getState(extra.status)?.state !== "on")) {
-            confirm.hide();
-          }
-
-          if (power) power.textContent = this._formatValue(extra.power, 0, "W");
-
-          if (statusWrap) {
-            const status = this._getState(extra.status);
-
-            if (hasStateIcon) {
-              statusIcon.hass = this._hass;
-              statusIcon.stateObj = status;
-            } else {
-              const fallback = status?.attributes?.icon ||
-                (status?.state === "on" ? "mdi:checkbox-marked-circle" : "mdi:radiobox-blank");
-
-              if (statusIcon.icon !== fallback) statusIcon.icon = fallback;
-            }
-
-            statusWrap.classList.toggle("on", status?.state === "on");
-            statusWrap.classList.toggle("unavailable", !status || status.state === "unavailable");
-            statusWrap.title = status ? this._stateText(status) : NO_VALUE;
-          }
-
-          const toggleName = isOn ? "mdi:toggle-switch-variant" : "mdi:toggle-switch-variant-off";
-
-          if (toggleIcon.icon !== toggleName) toggleIcon.icon = toggleName;
-
-          toggle.classList.toggle("on", isOn);
-          toggle.classList.toggle("unavailable", !state || state.state === "unavailable");
-          toggle.title = state ? this._stateText(state) : NO_VALUE;
-
-          if (extra.switchable) {
-            toggle.setAttribute("aria-checked", String(isOn));
-            toggle.setAttribute("aria-label", text);
-          }
-        };
-
-        return { el, update, dispose: () => confirm.dispose() };
       }
 
       // ----- Bijwerken -----
