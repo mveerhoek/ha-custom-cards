@@ -18,3 +18,4 @@ import "./custom-rows-extras/power-switch.js";
 import "./custom-rows-extras/sensors.js";
 import "./custom-rows-extras/bambu.js";
 import "./custom-rows-extras/camera.js";
+import "./custom-rows-extras/image.js";

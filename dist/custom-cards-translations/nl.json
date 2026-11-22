@@ -99,6 +99,7 @@
   "error.rows_extra_type": "Regel {index}, extra {extra}: type moet media_player, climate, power_switch, cover, light, sensors, consumption of bambu_print zijn.",
   "error.rows_extra_entity": "Regel {index}, extra {extra}: stel een entiteit in met de optie entity.",
   "error.rows_extra_bambu": "Regel {index}, extra {extra}: stel minstens één entiteit in, zoals status of camera.",
+  "error.rows_extra_image": "Regel {index}, extra {extra}: mist een afbeelding (image).",
   "rows.confirm_off": "{name} uitschakelen?",
   "card.desktop.name": "Desktopkaart",
   "card.desktop.description": "CPU, RAM, temperatuur en opslag.",
