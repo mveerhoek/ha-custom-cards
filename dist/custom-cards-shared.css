@@ -924,6 +924,14 @@ ha-card {
   --cc-badge-offset: -9px;
 }
 
+/* Afbeelding (image): volle breedte van de rij */
+.extra-image-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
 /* Badges: klein statusicoon in een hoek van het hoofdicoon. Eerste badge rechtsboven,
    tweede rechtsonder, derde rechtsmidden (max. 3). Niet klikbaar: een klik valt door naar het icoon (schakelaar). */
 .entry-badge {
