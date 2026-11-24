@@ -53,6 +53,10 @@
     const stepper = document.createElement("div");
     stepper.className = "stepper";
 
+    // Voorinstelling (preset_mode) kiezen in een pop-up; staat direct links van de min-knop
+    const preset = card._iconButton(() => openPresetPopup());
+    preset.setIcon("mdi:air-filter");
+
     const minus = card._iconButton(() => change(-1));
     minus.setIcon("mdi:minus");
 
@@ -62,7 +66,7 @@
     const plus = card._iconButton(() => change(1));
     plus.setIcon("mdi:plus");
 
-    stepper.append(minus.el, value, plus.el);
+    stepper.append(preset.el, minus.el, value, plus.el);
     view.append(info.el, labels, stepper);
     el.append(view);
 
@@ -123,6 +127,118 @@
       }, 600);
     };
 
+    // Pop-up met een dropdown van de beschikbare voorinstellingen. Staat op document.body (buiten
+    // de kaart), daarom is de opmaak inline en gebruikt die alleen de thema-variabelen van Home Assistant.
+    let popup = null;
+
+    const closePopup = () => {
+      if (!popup) return;
+
+      document.removeEventListener("keydown", popup.onKey, true);
+      popup.backdrop.remove();
+      popup = null;
+    };
+
+    const presetLabel = (state, mode) => {
+      try {
+        return card._hass?.formatEntityAttributeValue?.(state, "preset_mode", mode) ?? mode;
+      } catch (err) {
+        return mode;
+      }
+    };
+
+    const openPresetPopup = () => {
+      const state = card._getState(extra.entity);
+      const modes = state?.attributes?.preset_modes;
+
+      if (!isAvailable(state) || !Array.isArray(modes) || !modes.length) return;
+
+      closePopup();
+
+      const title = card._t("rows.climate_preset");
+
+      const backdrop = document.createElement("div");
+      backdrop.style.cssText = "position:fixed;inset:0;z-index:1000;display:flex;align-items:center;" +
+        "justify-content:center;box-sizing:border-box;padding:16px;background:rgba(0,0,0,0.5);" +
+        "font-family:var(--paper-font-body1_-_font-family, Roboto, sans-serif);";
+
+      const dialog = document.createElement("div");
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      dialog.setAttribute("aria-label", title);
+      dialog.style.cssText = "box-sizing:border-box;width:100%;max-width:360px;padding:16px 20px;" +
+        "border-radius:var(--ha-card-border-radius, 12px);" +
+        "background:var(--ha-card-background, var(--card-background-color, #fff));" +
+        "color:var(--primary-text-color);box-shadow:0 8px 32px rgba(0,0,0,0.35);";
+
+      const heading = document.createElement("div");
+      heading.textContent = extra.name || state.attributes?.friendly_name || extra.entity;
+      heading.style.cssText = "font-size:1.2em;font-weight:500;overflow-wrap:anywhere;";
+
+      const sub = document.createElement("div");
+      sub.textContent = title;
+      sub.style.cssText = "margin:2px 0 12px;color:var(--secondary-text-color);";
+
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", title);
+      select.style.cssText = "box-sizing:border-box;width:100%;padding:10px 12px;font:inherit;font-size:14px;" +
+        "border:1px solid var(--divider-color);border-radius:8px;" +
+        "background:var(--card-background-color, #fff);color:var(--primary-text-color);";
+
+      const current = state.attributes?.preset_mode;
+
+      // Staat het toestel op een waarde die niet in de lijst staat (of op geen), toon dan een lege keuze
+      if (!modes.includes(current)) {
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = NO_VALUE;
+        empty.disabled = true;
+        empty.selected = true;
+        select.append(empty);
+      }
+
+      modes.forEach((mode) => {
+        const option = document.createElement("option");
+        option.value = mode;
+        option.textContent = presetLabel(state, mode);
+        option.selected = mode === current;
+        select.append(option);
+      });
+
+      select.addEventListener("change", () => {
+        const mode = select.value;
+
+        closePopup();
+        if (mode && mode !== current) {
+          card._callService("climate", "set_preset_mode", { entity_id: extra.entity, preset_mode: mode });
+        }
+      });
+
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = card._t("rows.close");
+      close.style.cssText = "display:block;margin:12px 0 0 auto;padding:8px 12px;font:inherit;border:0;" +
+        "border-radius:8px;background:transparent;color:var(--primary-color);cursor:pointer;";
+      close.addEventListener("click", closePopup);
+
+      dialog.append(heading, sub, select, close);
+      backdrop.append(dialog);
+      backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) closePopup();
+      });
+
+      const onKey = (event) => {
+        if (event.key !== "Escape") return;
+        event.stopPropagation();
+        closePopup();
+      };
+
+      document.addEventListener("keydown", onKey, true);
+      document.body.append(backdrop);
+      popup = { backdrop, onKey };
+      select.focus();
+    };
+
     const update = () => {
       const state = card._getState(extra.entity);
       const attrs = state?.attributes || {};
@@ -132,6 +248,7 @@
       status.textContent = state ? card._stateText(state) : NO_VALUE;
 
       info.el.setAttribute("aria-label", card._t("rows.more_info", { name: name.textContent }));
+      preset.el.setAttribute("aria-label", card._t("rows.climate_preset"));
       minus.el.setAttribute("aria-label", card._t("rows.decrease_temperature"));
       plus.el.setAttribute("aria-label", card._t("rows.increase_temperature"));
       info.setIcon(extra.icon || CLIMATE_ICONS[state?.state] || "mdi:thermostat");
@@ -150,12 +267,18 @@
       const min = toNumber(attrs.min_temp);
       const max = toNumber(attrs.max_temp);
 
+      // Zonder voorinstellingen op het toestel is de knop verborgen; onbeschikbaar = uitgeschakeld
+      const hasPresets = Array.isArray(attrs.preset_modes) && attrs.preset_modes.length > 0;
+
+      preset.el.hidden = available && !hasPresets;
+      preset.el.disabled = !available || !hasPresets;
       minus.el.disabled = !available || current === null || (min !== null && current <= min);
       plus.el.disabled = !available || current === null || (max !== null && current >= max);
     };
 
     const dispose = () => {
       disposeLongPress();
+      closePopup();
       control.disposed = true;
       clearTimeout(control.clearTimer);
       if (control.sendTimer) {
