@@ -40,16 +40,20 @@ uses `image`). `name` and `icon` override the entity name and icon. Supported ty
   mute button on the left and a cancel button on the right. Optionally set
   `badge` (see [Badges](#badges)) to show a badge on the entry icon while the
   player is playing.
-- `climate`: shows status and target temperature with plus/minus buttons;
-  `step` sets the increment (default `0.5`). The button left of the minus
-  button (`mdi:air-filter`) opens a pop-up with a dropdown of the available
-  presets (`preset_modes`) of the climate; choosing one applies it directly. The active preset is also shown after the
-  state in the second line (e.g. `Heating · Powerful`), except for `none`. The
-  button is hidden when the climate has no presets. Long-press the extra to turn it on
-  or off. A light-blue circle grows while pressing and briefly lights up when
-  the action is triggered after 0.5 seconds. Releasing early, moving or
-  scrolling cancels it; buttons do not trigger the long press. A heating or
-  cooling badge appears on the entry icon (see [Badges](#badges)).
+- `climate`: shows status and target temperature, right-aligned. Click the
+  temperature to open a pop-up with the minus button, the temperature and the
+  plus button on one line; the temperature is only set, and the pop-up only
+  closes, when you press Confirm (Cancel or Escape discards the change). `step`
+  sets the increment (default `0.5`). The button left of the temperature
+  (`mdi:air-filter`) opens a pop-up with a dropdown of the available presets
+  (`preset_modes`) of the climate; choosing one applies it directly. The button
+  is hidden when the climate has no presets. The active preset is also shown
+  after the state in the second line (e.g. `Heating · Powerful`), except for
+  `none`. Long-press the extra to turn it on or off. A light-blue circle grows
+  while pressing and briefly lights up when the action is triggered after 0.5
+  seconds. Releasing early, moving or scrolling cancels it; buttons do not
+  trigger the long press. A heating or cooling badge appears on the entry icon
+  (see [Badges](#badges)).
 - `power_switch`: shows the switch state, optionally a `power` sensor and
   `status` binary sensor. Set `switchable: true` to enable control. Turning off
   a switch while its `status` sensor is on requires an inline confirmation;
