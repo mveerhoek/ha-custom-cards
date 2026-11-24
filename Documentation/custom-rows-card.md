@@ -43,7 +43,8 @@ uses `image`). `name` and `icon` override the entity name and icon. Supported ty
 - `climate`: shows status and target temperature with plus/minus buttons;
   `step` sets the increment (default `0.5`). The button left of the minus
   button (`mdi:air-filter`) opens a pop-up with a dropdown of the available
-  presets (`preset_modes`) of the climate; choosing one applies it directly. The
+  presets (`preset_modes`) of the climate; choosing one applies it directly. The active preset is also shown after the
+  state in the second line (e.g. `Heating · Powerful`), except for `none`. The
   button is hidden when the climate has no presets. Long-press the extra to turn it on
   or off. A light-blue circle grows while pressing and briefly lights up when
   the action is triggered after 0.5 seconds. Releasing early, moving or
