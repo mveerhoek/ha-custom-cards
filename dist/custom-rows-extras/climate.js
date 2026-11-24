@@ -245,7 +245,15 @@
       const available = isAvailable(state);
 
       name.textContent = extra.name || attrs.friendly_name || extra.entity;
-      status.textContent = state ? card._stateText(state) : NO_VALUE;
+      // Tweede regel: status en voorinstelling, gescheiden door "·" (zoals de waarden van het hoofditem).
+      // De voorinstelling "none" (geen) wordt niet getoond.
+      const presetMode = attrs.preset_mode;
+      const showPreset = available && typeof presetMode === "string" && presetMode !== "" &&
+        presetMode.toLowerCase() !== "none";
+
+      status.textContent = state
+        ? [card._stateText(state), showPreset ? presetLabel(state, presetMode) : null].filter(Boolean).join(" · ")
+        : NO_VALUE;
 
       info.el.setAttribute("aria-label", card._t("rows.more_info", { name: name.textContent }));
       preset.el.setAttribute("aria-label", card._t("rows.climate_preset"));
