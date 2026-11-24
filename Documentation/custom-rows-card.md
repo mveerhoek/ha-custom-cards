@@ -41,7 +41,10 @@ uses `image`). `name` and `icon` override the entity name and icon. Supported ty
   `badge` (see [Badges](#badges)) to show a badge on the entry icon while the
   player is playing.
 - `climate`: shows status and target temperature with plus/minus buttons;
-  `step` sets the increment (default `0.5`). Long-press the extra to turn it on
+  `step` sets the increment (default `0.5`). The button left of the minus
+  button (`mdi:air-filter`) opens a pop-up with a dropdown of the available
+  presets (`preset_modes`) of the climate; choosing one applies it directly. The
+  button is hidden when the climate has no presets. Long-press the extra to turn it on
   or off. A light-blue circle grows while pressing and briefly lights up when
   the action is triggered after 0.5 seconds. Releasing early, moving or
   scrolling cancels it; buttons do not trigger the long press. A heating or
