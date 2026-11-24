@@ -124,6 +124,7 @@
   "rows.close": "Close",
   "rows.decrease_temperature": "Decrease temperature",
   "rows.increase_temperature": "Increase temperature",
+  "rows.climate_preset": "Change preset",
   "rows.cancel": "Cancel",
   "rows.confirm": "Confirm",
   "rows.cover_toggle": "Open or close",
