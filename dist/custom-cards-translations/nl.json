@@ -124,6 +124,8 @@
   "rows.close": "Sluiten",
   "rows.decrease_temperature": "Temperatuur verlagen",
   "rows.increase_temperature": "Temperatuur verhogen",
+  "rows.climate_preset": "Voorinstelling wijzigen",
+  "rows.climate_set_temperature": "Temperatuur instellen",
   "rows.cancel": "Annuleren",
   "rows.confirm": "Bevestigen",
   "rows.cover_toggle": "Openen of sluiten",

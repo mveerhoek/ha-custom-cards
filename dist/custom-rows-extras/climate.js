@@ -36,7 +36,7 @@
     const view = document.createElement("div");
     view.className = "extra-view";
 
-    // Icoon (more-info) | naam boven status | - temperatuur +
+    // Icoon (more-info) | naam boven status | voorinstelling-knop, temperatuur
     const info = card._iconButton(() => card._openMoreInfo(extra.entity));
 
     const labels = document.createElement("div");
@@ -53,16 +53,19 @@
     const stepper = document.createElement("div");
     stepper.className = "stepper";
 
-    const minus = card._iconButton(() => change(-1));
-    minus.setIcon("mdi:minus");
+    // Voorinstelling (preset_mode) kiezen in een pop-up
+    const preset = card._iconButton(() => openPresetPopup());
+    preset.setIcon("mdi:air-filter");
 
-    const value = document.createElement("div");
+    // De temperatuur is een knop (rechts uitgelijnd): een klik opent de pop-up om hem aan te passen
+    const value = document.createElement("button");
+    value.type = "button";
     value.className = "stepper-value";
+    value.style.cssText = "background:none;border:0;margin:0;padding:6px 0 6px 8px;color:inherit;" +
+      "font-family:inherit;cursor:pointer;text-align:right;";
+    value.addEventListener("click", () => openTemperaturePopup());
 
-    const plus = card._iconButton(() => change(1));
-    plus.setIcon("mdi:plus");
-
-    stepper.append(minus.el, value, plus.el);
+    stepper.append(preset.el, value);
     view.append(info.el, labels, stepper);
     el.append(view);
 
@@ -79,48 +82,226 @@
       });
     }, { canStart: () => isAvailable(card._getState(extra.entity)) });
 
-    // Snel achter elkaar klikken: de gekozen waarde wordt direct getoond en na een
-    // korte pauze in één keer doorgegeven aan Home Assistant.
-    const control = { pending: null, sendTimer: null, clearTimer: null, disposed: false };
+    // ----- Pop-ups -----
+    // Ze staan op document.body (buiten de kaart); daarom is de opmaak inline en gebruikt die alleen
+    // de thema-variabelen van Home Assistant. Er is maximaal één pop-up tegelijk open.
+    let popup = null;
 
-    const attributes = () => card._getState(extra.entity)?.attributes || {};
+    const closePopup = () => {
+      if (!popup) return;
 
-    const change = (direction) => {
-      const attrs = attributes();
-      const base = control.pending ?? toNumber(attrs.temperature);
+      document.removeEventListener("keydown", popup.onKey, true);
+      popup.backdrop.remove();
+      popup = null;
+    };
 
-      if (base === null) return;
+    // Ronde icoonknop met hetzelfde uiterlijk als .icon-btn
+    const roundButton = (icon, label, onClick) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("aria-label", label);
+      button.style.cssText = "display:flex;align-items:center;justify-content:center;flex-shrink:0;" +
+        "box-sizing:border-box;width:32px;height:32px;padding:0;border:none;border-radius:50%;" +
+        "cursor:pointer;font:inherit;--mdc-icon-size:20px;color:var(--secondary-text-color);" +
+        "background:color-mix(in srgb, var(--secondary-text-color) 14%, transparent);";
 
-      let next = Math.round((base + direction * extra.step) / extra.step) * extra.step;
-      next = Math.round(next * 100) / 100;
+      const iconEl = document.createElement("ha-icon");
+      iconEl.icon = icon;
+      button.append(iconEl);
+      button.addEventListener("click", onClick);
+
+      button.setDisabled = (disabled) => {
+        button.disabled = disabled;
+        button.style.opacity = disabled ? "0.4" : "";
+        button.style.cursor = disabled ? "default" : "pointer";
+      };
+
+      return button;
+    };
+
+    const textButton = (label, onClick, primary = false) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = label;
+      button.style.cssText = "padding:8px 12px;font:inherit;border:0;border-radius:8px;background:transparent;" +
+        `cursor:pointer;color:${primary ? "var(--primary-color)" : "var(--secondary-text-color)"};` +
+        (primary ? "font-weight:500;" : "");
+      button.addEventListener("click", onClick);
+
+      return button;
+    };
+
+    // Basis van een pop-up: titel (naam van de entiteit), ondertitel en een lege inhoud.
+    // dismissOnBackdrop: een klik naast de pop-up sluit hem (bij temperatuur niet: alleen
+    // Annuleren, Escape of Bevestigen sluit die).
+    const openDialog = (state, subtitle, { dismissOnBackdrop = true } = {}) => {
+      closePopup();
+
+      const backdrop = document.createElement("div");
+      backdrop.style.cssText = "position:fixed;inset:0;z-index:1000;display:flex;align-items:center;" +
+        "justify-content:center;box-sizing:border-box;padding:16px;background:rgba(0,0,0,0.5);" +
+        "font-family:var(--paper-font-body1_-_font-family, Roboto, sans-serif);";
+
+      const dialog = document.createElement("div");
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+      dialog.setAttribute("aria-label", subtitle);
+      dialog.style.cssText = "box-sizing:border-box;width:100%;max-width:360px;padding:16px 20px;" +
+        "border-radius:var(--ha-card-border-radius, 12px);" +
+        "background:var(--ha-card-background, var(--card-background-color, #fff));" +
+        "color:var(--primary-text-color);box-shadow:0 8px 32px rgba(0,0,0,0.35);";
+
+      const heading = document.createElement("div");
+      heading.textContent = extra.name || state.attributes?.friendly_name || extra.entity;
+      heading.style.cssText = "font-size:1.2em;font-weight:500;overflow-wrap:anywhere;";
+
+      const sub = document.createElement("div");
+      sub.textContent = subtitle;
+      sub.style.cssText = "margin:2px 0 12px;color:var(--secondary-text-color);";
+
+      dialog.append(heading, sub);
+      backdrop.append(dialog);
+
+      if (dismissOnBackdrop) {
+        backdrop.addEventListener("click", (event) => {
+          if (event.target === backdrop) closePopup();
+        });
+      }
+
+      const onKey = (event) => {
+        if (event.key !== "Escape") return;
+        event.stopPropagation();
+        closePopup();
+      };
+
+      document.addEventListener("keydown", onKey, true);
+      document.body.append(backdrop);
+      popup = { backdrop, onKey };
+
+      return dialog;
+    };
+
+    // Voorinstelling: dropdown met de beschikbare voorinstellingen; kiezen stelt direct in
+    const presetLabel = (state, mode) => {
+      try {
+        return card._hass?.formatEntityAttributeValue?.(state, "preset_mode", mode) ?? mode;
+      } catch (err) {
+        return mode;
+      }
+    };
+
+    const openPresetPopup = () => {
+      const state = card._getState(extra.entity);
+      const modes = state?.attributes?.preset_modes;
+
+      if (!isAvailable(state) || !Array.isArray(modes) || !modes.length) return;
+
+      const title = card._t("rows.climate_preset");
+      const dialog = openDialog(state, title);
+
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", title);
+      select.style.cssText = "box-sizing:border-box;width:100%;padding:10px 12px;font:inherit;font-size:14px;" +
+        "border:1px solid var(--divider-color);border-radius:8px;" +
+        "background:var(--card-background-color, #fff);color:var(--primary-text-color);";
+
+      const current = state.attributes?.preset_mode;
+
+      // Staat het toestel op een waarde die niet in de lijst staat (of op geen), toon dan een lege keuze
+      if (!modes.includes(current)) {
+        const empty = document.createElement("option");
+        empty.value = "";
+        empty.textContent = NO_VALUE;
+        empty.disabled = true;
+        empty.selected = true;
+        select.append(empty);
+      }
+
+      modes.forEach((mode) => {
+        const option = document.createElement("option");
+        option.value = mode;
+        option.textContent = presetLabel(state, mode);
+        option.selected = mode === current;
+        select.append(option);
+      });
+
+      select.addEventListener("change", () => {
+        const mode = select.value;
+
+        closePopup();
+        if (mode && mode !== current) {
+          card._callService("climate", "set_preset_mode", { entity_id: extra.entity, preset_mode: mode });
+        }
+      });
+
+      const actions = document.createElement("div");
+      actions.style.cssText = "display:flex;justify-content:flex-end;margin-top:12px;";
+      actions.append(textButton(card._t("rows.close"), closePopup));
+
+      dialog.append(select, actions);
+      select.focus();
+    };
+
+    // Temperatuur: - waarde + op één regel; pas bij Bevestigen wordt de waarde ingesteld en sluit de pop-up
+    const openTemperaturePopup = () => {
+      const state = card._getState(extra.entity);
+      const attrs = state?.attributes || {};
+      const original = toNumber(attrs.temperature);
+
+      if (!isAvailable(state) || original === null) return;
 
       const min = toNumber(attrs.min_temp);
       const max = toNumber(attrs.max_temp);
+      const unit = card._hass?.config?.unit_system?.temperature || "°C";
+      let target = original;
 
-      if (min !== null) next = Math.max(min, next);
-      if (max !== null) next = Math.min(max, next);
+      const dialog = openDialog(state, card._t("rows.climate_set_temperature"), { dismissOnBackdrop: false });
 
-      control.pending = next;
-      clearTimeout(control.clearTimer);
-      clearTimeout(control.sendTimer);
-      update();
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;justify-content:center;gap:16px;margin:8px 0 4px;";
 
-      control.sendTimer = setTimeout(async () => {
-        control.sendTimer = null;
-        const target = control.pending;
+      const minus = roundButton("mdi:minus", card._t("rows.decrease_temperature"), () => change(-1));
+      const plus = roundButton("mdi:plus", card._t("rows.increase_temperature"), () => change(1));
 
-        await card._callService("climate", "set_temperature", {
-          entity_id: extra.entity,
-          temperature: target
-        });
+      const display = document.createElement("div");
+      display.setAttribute("aria-live", "polite");
+      display.style.cssText = "min-width:96px;text-align:center;font-size:1.5em;font-weight:500;" +
+        "font-variant-numeric:tabular-nums;white-space:nowrap;";
 
-        if (control.disposed) return;
-        // Even wachten tot de nieuwe status binnen is, daarna volgt het label de entiteit weer
-        control.clearTimer = setTimeout(() => {
-          control.pending = null;
-          update();
-        }, 1500);
-      }, 600);
+      const refresh = () => {
+        display.textContent = `${card._formatNumber1(target)} ${unit}`;
+        minus.setDisabled(min !== null && target <= min);
+        plus.setDisabled(max !== null && target >= max);
+      };
+
+      const change = (direction) => {
+        let next = Math.round((target + direction * extra.step) / extra.step) * extra.step;
+        next = Math.round(next * 100) / 100;
+
+        if (min !== null) next = Math.max(min, next);
+        if (max !== null) next = Math.min(max, next);
+
+        target = next;
+        refresh();
+      };
+
+      row.append(minus, display, plus);
+
+      const confirm = textButton(card._t("rows.confirm"), () => {
+        closePopup();
+
+        if (target !== original) {
+          card._callService("climate", "set_temperature", { entity_id: extra.entity, temperature: target });
+        }
+      }, true);
+
+      const actions = document.createElement("div");
+      actions.style.cssText = "display:flex;justify-content:flex-end;gap:8px;margin-top:12px;";
+      actions.append(textButton(card._t("rows.cancel"), closePopup), confirm);
+
+      dialog.append(row, actions);
+      refresh();
+      confirm.focus();
     };
 
     const update = () => {
@@ -129,11 +310,19 @@
       const available = isAvailable(state);
 
       name.textContent = extra.name || attrs.friendly_name || extra.entity;
-      status.textContent = state ? card._stateText(state) : NO_VALUE;
+
+      // Tweede regel: status en voorinstelling, gescheiden door "·" (zoals de waarden van het hoofditem).
+      // De voorinstelling "none" (geen) wordt niet getoond.
+      const presetMode = attrs.preset_mode;
+      const showPreset = available && typeof presetMode === "string" && presetMode !== "" &&
+        presetMode.toLowerCase() !== "none";
+
+      status.textContent = state
+        ? [card._stateText(state), showPreset ? presetLabel(state, presetMode) : null].filter(Boolean).join(" · ")
+        : NO_VALUE;
 
       info.el.setAttribute("aria-label", card._t("rows.more_info", { name: name.textContent }));
-      minus.el.setAttribute("aria-label", card._t("rows.decrease_temperature"));
-      plus.el.setAttribute("aria-label", card._t("rows.increase_temperature"));
+      preset.el.setAttribute("aria-label", card._t("rows.climate_preset"));
       info.setIcon(extra.icon || CLIMATE_ICONS[state?.state] || "mdi:thermostat");
 
       // Kleur volgens wat het toestel nu doet (hvac_action, anders de ingestelde modus)
@@ -142,28 +331,26 @@
       info.el.classList.toggle("heating", action === "heating");
       info.el.classList.toggle("cooling", action === "cooling");
 
-      const current = control.pending ?? toNumber(attrs.temperature);
+      const current = toNumber(attrs.temperature);
       const unit = card._hass?.config?.unit_system?.temperature || "°C";
 
       value.textContent = current === null ? NO_VALUE : `${card._formatNumber1(current)} ${unit}`;
+      value.disabled = !available || current === null;
+      value.style.cursor = value.disabled ? "default" : "pointer";
+      value.setAttribute("aria-label", card._t("rows.climate_set_temperature"));
 
-      const min = toNumber(attrs.min_temp);
-      const max = toNumber(attrs.max_temp);
+      // Zonder voorinstellingen op het toestel is de knop verborgen; onbeschikbaar = uitgeschakeld
+      const hasPresets = Array.isArray(attrs.preset_modes) && attrs.preset_modes.length > 0;
 
-      minus.el.disabled = !available || current === null || (min !== null && current <= min);
-      plus.el.disabled = !available || current === null || (max !== null && current >= max);
+      preset.el.hidden = available && !hasPresets;
+      preset.el.disabled = !available || !hasPresets;
     };
 
     const dispose = () => {
       disposeLongPress();
-      control.disposed = true;
-      clearTimeout(control.clearTimer);
-      if (control.sendTimer) {
-        clearTimeout(control.sendTimer);
-        control.sendTimer = null;
-        card._callService("climate", "set_temperature", { entity_id: extra.entity, temperature: control.pending });
-      }
+      closePopup();
     };
+
     return { el, update, dispose };
   };
 
