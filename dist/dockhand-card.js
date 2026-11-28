@@ -385,7 +385,18 @@
         const status = document.createElement("div");
         status.className = "status-badge";
 
-        top.append(projectName, status);
+        // Update-indicator: zichtbaar als één of meer containers van het project een update hebben
+        const updateIcon = document.createElement("ha-icon");
+        updateIcon.className = "project-update";
+        updateIcon.icon = "mdi:package-up";
+        updateIcon.hidden = true;
+
+        // Icoon links van het statusveld
+        const statusGroup = document.createElement("div");
+        statusGroup.className = "project-status";
+        statusGroup.append(updateIcon, status);
+
+        top.append(projectName, statusGroup);
 
         // Tweede regel: CPU, RAM, Rx en Tx
         const summary = document.createElement("div");
@@ -414,7 +425,7 @@
 
         el.append(header, grid);
 
-        const project = { name, el, summary, status, grid, rows: [] };
+        const project = { name, el, summary, status, updateIcon, grid, rows: [] };
 
         this._createRows(project, members);
 
@@ -655,6 +666,7 @@
 
         let resolved = 0;
         let runningRows = 0;
+        let updateCount = 0;
         let cpu = 0;
         let memory = 0;
         let rx = 0;
@@ -703,6 +715,8 @@
           }
 
           // Update-knop
+          if (updateAvailable) updateCount++;
+
           row.updateButton.hidden = !updateAvailable && !updateBusy;
           row.updateButton.disabled = updateBusy;
           row.updateButton.classList.toggle("updating", updateBusy);
@@ -843,6 +857,16 @@
 
         project.status.textContent = label;
         this._setBadge(project.status, type);
+
+        // Update-indicator van het project
+        const updateText = updateCount
+          ? this._t(updateCount === 1 ? "dockhand.project_updates_one" : "dockhand.project_updates_other", {
+              count: updateCount
+            })
+          : "";
+        project.updateIcon.hidden = updateCount === 0;
+        project.updateIcon.title = updateText;
+        project.updateIcon.setAttribute("aria-label", updateText);
 
         return { running: running ?? 0, total, cpu, memory, cpuSeen, memorySeen };
       }
