@@ -160,6 +160,8 @@
   "dockhand.update_available": "Update beschikbaar voor {name}",
   "dockhand.update_running": "{name} wordt bijgewerkt…",
   "dockhand.confirm_update": "{name} nu updaten?",
+  "dockhand.project_updates_one": "{count} update beschikbaar",
+  "dockhand.project_updates_other": "{count} updates beschikbaar",
   "editor.dockhand.environment": "Omgeving",
   "editor.dockhand.environment.help": "Optioneel: toon alleen de stacks en containers van deze Dockhand-omgeving (naam zoals in Dockhand).",
   "editor.dockhand.css_url": "CSS-URL",
