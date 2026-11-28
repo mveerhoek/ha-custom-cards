@@ -321,6 +321,21 @@ ha-card {
 }
 .container-update[hidden] { display: none; }
 
+/* Projectkop: update-indicator links van het statusveld */
+.project-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-update {
+  --mdc-icon-size: 20px;
+  color: var(--warning-color, #ff9800);
+  flex-shrink: 0;
+}
+
+.project-update[hidden] { display: none; }
+
 /* Meetwaarde (IP, CPU, RAM, gebruik, temperatuur) */
 .device-value,
 .volume-usage,
