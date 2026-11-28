@@ -241,6 +241,9 @@
           switchId: shortest(item.entries.filter(
             (e) => e.id.startsWith("switch.") && !/auto_?(update|deploy)|automatisch/i.test(e.id + e.key)
           )),
+          // update-entiteit van de integratie ("Image update"); alleen aanwezig als
+          // "Enable container updates" in de Dockhand-integratie aan staat
+          updateId: shortest(item.entries.filter((e) => e.id.startsWith("update."))),
           cpuId: pick(/cpu/i, /limit|limiet/i),
           // Meerdere geheugensensoren (gebruik, limiet, %): de juiste wordt op eenheid gekozen
           memoryIds: sensors
@@ -382,7 +385,18 @@
         const status = document.createElement("div");
         status.className = "status-badge";
 
-        top.append(projectName, status);
+        // Update-indicator: zichtbaar als één of meer containers van het project een update hebben
+        const updateIcon = document.createElement("ha-icon");
+        updateIcon.className = "project-update";
+        updateIcon.icon = "mdi:package-up";
+        updateIcon.hidden = true;
+
+        // Icoon links van het statusveld
+        const statusGroup = document.createElement("div");
+        statusGroup.className = "project-status";
+        statusGroup.append(updateIcon, status);
+
+        top.append(projectName, statusGroup);
 
         // Tweede regel: CPU, RAM, Rx en Tx
         const summary = document.createElement("div");
@@ -411,7 +425,7 @@
 
         el.append(header, grid);
 
-        const project = { name, el, summary, status, grid, rows: [] };
+        const project = { name, el, summary, status, updateIcon, grid, rows: [] };
 
         this._createRows(project, members);
 
@@ -451,8 +465,23 @@
           const toggleIcon = document.createElement("ha-icon");
           toggleButton.append(toggleIcon);
 
+          // Update-knop: alleen zichtbaar als Dockhand een update voor de container meldt
+          const updateButton = document.createElement("button");
+          updateButton.className = "container-update";
+          updateButton.type = "button";
+          updateButton.hidden = true;
+
+          const updateIcon = document.createElement("ha-icon");
+          updateIcon.icon = "mdi:package-up";
+          updateButton.append(updateIcon);
+
+          // Beide knoppen delen één cel (laatste kolom): update links van aan/uit
+          const actions = document.createElement("div");
+          actions.className = "container-actions";
+          actions.append(updateButton, toggleButton);
+
           // Bevestiging in de rij zelf (zie _rowConfirm in custom-cards-shared.js)
-          const cells = [icon, nameEl, cpu, memory, state, toggleButton];
+          const cells = [icon, nameEl, cpu, memory, state, actions];
 
           const confirm = this._rowConfirm({
             cells,
@@ -461,7 +490,21 @@
             yesClass: "container-confirm-yes",
             timeout: CONFIRM_TIMEOUT,
             onConfirm: () => {
-              const switchId = row.container ? this._roles(row.container).switchId : null;
+              const roles = row.container ? this._roles(row.container) : null;
+
+              if (row.confirmAction === "update") {
+                if (!roles?.updateId) return;
+
+                this._runAction({
+                  action: "perform-action",
+                  perform_action: "update.install",
+                  data: { entity_id: roles.updateId },
+                  confirmation: false
+                });
+                return;
+              }
+
+              const switchId = roles?.switchId;
               if (!switchId) return;
 
               this._runAction({
@@ -475,7 +518,9 @@
 
           const row = {
             name, container, icon, cpu, memory, state, toggleButton, toggleIcon,
+            updateButton,
             confirm,
+            confirmAction: "toggle",
             confirmTurnOff: false
           };
 
@@ -485,11 +530,22 @@
             const switchId = container ? this._roles(container).switchId : null;
             if (!switchId) return;
 
+            row.confirmAction = "toggle";
             row.confirmTurnOff = this._hass?.states[switchId]?.state === "on";
             confirm.show(this._confirmQuestion(row));
           });
 
-          project.grid.append(icon, nameEl, cpu, memory, state, toggleButton, ...confirm.cells);
+          updateButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+
+            const updateId = container ? this._roles(container).updateId : null;
+            if (!updateId || this._hass?.states[updateId]?.state !== "on") return;
+
+            row.confirmAction = "update";
+            confirm.show(this._confirmQuestion(row));
+          });
+
+          project.grid.append(icon, nameEl, cpu, memory, state, actions, ...confirm.cells);
 
           return row;
         });
@@ -497,6 +553,10 @@
 
       // Vraag van de bevestiging (volgt de taal van Home Assistant)
       _confirmQuestion(row) {
+        if (row.confirmAction === "update") {
+          return this._t("dockhand.confirm_update", { name: row.name });
+        }
+
         return this._t(row.confirmTurnOff ? "docker.confirm_off" : "docker.confirm_on", { name: row.name });
       }
 
@@ -606,6 +666,7 @@
 
         let resolved = 0;
         let runningRows = 0;
+        let updateCount = 0;
         let cpu = 0;
         let memory = 0;
         let rx = 0;
@@ -637,11 +698,34 @@
           if (known) resolved++;
           if (isRunning) runningRows++;
 
-          // Bevestiging open: tekst bijwerken; is de schakelaar inmiddels al omgezet, dan vervalt de vraag
+          // Update beschikbaar: de update-entiteit van de integratie ("on" = update beschikbaar)
+          const updateState = roles?.updateId ? this._hass.states[roles.updateId] : null;
+          const updateAvailable = updateState?.state === "on";
+          const updateBusy = Boolean(updateState?.attributes?.in_progress);
+
+          // Bevestiging open: tekst bijwerken; is de situatie inmiddels veranderd
+          // (schakelaar omgezet of update niet meer beschikbaar), dan vervalt de vraag
           if (row.confirm.isShown()) {
-            if (row.confirmTurnOff !== (switchState === "on")) row.confirm.hide();
+            const stale = row.confirmAction === "update"
+              ? !updateAvailable || updateBusy
+              : row.confirmTurnOff !== (switchState === "on");
+
+            if (stale) row.confirm.hide();
             else row.confirm.setQuestion(this._confirmQuestion(row));
           }
+
+          // Update-knop
+          if (updateAvailable) updateCount++;
+
+          row.updateButton.hidden = !updateAvailable && !updateBusy;
+          row.updateButton.disabled = updateBusy;
+          row.updateButton.classList.toggle("updating", updateBusy);
+
+          const updateLabel = this._t(updateBusy ? "dockhand.update_running" : "dockhand.update_available", {
+            name: row.name
+          });
+          row.updateButton.setAttribute("aria-label", updateLabel);
+          row.updateButton.title = updateLabel;
 
           // Gestopte of onbekende containers hebben geen gebruik; draaiende zonder sensor: streepje
           const cpuValue = isRunning ? this._getNumber(roles.cpuId) : null;
@@ -773,6 +857,16 @@
 
         project.status.textContent = label;
         this._setBadge(project.status, type);
+
+        // Update-indicator van het project
+        const updateText = updateCount
+          ? this._t(updateCount === 1 ? "dockhand.project_updates_one" : "dockhand.project_updates_other", {
+              count: updateCount
+            })
+          : "";
+        project.updateIcon.hidden = updateCount === 0;
+        project.updateIcon.title = updateText;
+        project.updateIcon.setAttribute("aria-label", updateText);
 
         return { running: running ?? 0, total, cpu, memory, cpuSeen, memorySeen };
       }
