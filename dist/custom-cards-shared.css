@@ -320,7 +320,6 @@ ha-card {
   gap: 4px;
 }
 .container-update[hidden] { display: none; }
-.container-update.updating { opacity: 0.5; }
 
 /* Meetwaarde (IP, CPU, RAM, gebruik, temperatuur) */
 .device-value,
@@ -388,7 +387,8 @@ ha-card {
 
 /* Ronde icoonknop aan het eind van een rij (herstarten, aan/uit) */
 .restart-btn,
-.container-toggle {
+.container-toggle,
+.container-update {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -730,23 +730,45 @@ ha-card {
   grid-auto-rows: minmax(32px, auto);
 }
 
-.container-toggle {
-  color: var(--secondary-text-color);
+.container-toggle,
+.container-update {
+  transition: opacity 0.15s;
 }
 
-.container-toggle:hover {
-  color: var(--primary-color);
+.container-toggle {
+  color: var(--secondary-text-color);
 }
 
 .container-toggle.running {
   color: var(--success-color, var(--state-active-color));
 }
 
-.container-toggle ha-icon {
+/* Update beschikbaar: waarschuwingskleur */
+.container-update {
+  color: var(--warning-color, #ff9800);
+}
+
+.container-toggle ha-icon,
+.container-update ha-icon {
   --mdc-icon-size: 24px;
 }
 
-.container-toggle:focus-visible {
+/* Hover: alleen de dekking verandert, geen kleur of vlak */
+@media (hover: hover) {
+  .container-toggle:hover,
+  .container-update:not(:disabled):hover {
+    opacity: 0.6;
+  }
+}
+
+/* Update loopt: knop uitgeschakeld */
+.container-update:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.container-toggle:focus-visible,
+.container-update:focus-visible {
   outline: 2px solid var(--primary-color);
   outline-offset: 2px;
   border-radius: 4px;
