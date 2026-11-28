@@ -160,6 +160,8 @@
   "dockhand.update_available": "Update available for {name}",
   "dockhand.update_running": "Updating {name}…",
   "dockhand.confirm_update": "Update {name} now?",
+  "dockhand.project_updates_one": "{count} update available",
+  "dockhand.project_updates_other": "{count} updates available",
   "editor.dockhand.environment": "Environment",
   "editor.dockhand.environment.help": "Optional: only show the stacks and containers of this Dockhand environment (name as shown in Dockhand).",
   "editor.dockhand.css_url": "CSS URL",
