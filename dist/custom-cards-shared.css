@@ -313,6 +313,15 @@ ha-card {
   white-space: nowrap;
 }
 
+.container-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 4px;
+}
+.container-update[hidden] { display: none; }
+.container-update.updating { opacity: 0.5; }
+
 /* Meetwaarde (IP, CPU, RAM, gebruik, temperatuur) */
 .device-value,
 .volume-usage,
